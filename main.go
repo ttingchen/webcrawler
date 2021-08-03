@@ -41,14 +41,12 @@ func collectWatsons(prodname string) error {
 	count := 0
 	isElement := false
 	Err := ""
-	c := colly.NewCollector(
-	//colly.Debugger(&debug.LogDebugger{}),
-	)
+	c := colly.NewCollector()
 	c.Limit(&colly.LimitRule{
 		// Set a delay between requests to these domains
 		Delay: 1 * time.Second,
 		// Add an additional random delay
-		RandomDelay: 5 * time.Second,
+		RandomDelay: 55 * time.Second,
 	})
 
 	c.OnHTML("e2-product-list", func(e *colly.HTMLElement) {
@@ -89,7 +87,8 @@ func collectWatsons(prodname string) error {
 		}
 		if count > max_prod_num {
 			break
-		} else if !isElement {
+		}
+		if isElement != true {
 			break
 		}
 		if flag {
@@ -104,7 +103,7 @@ func collectWatsons(prodname string) error {
 	return nil
 }
 
-func collectEbay(search_item string) {
+func collectEbay(search_item string) error {
 
 	//get the max number of products to calculate the max number of pages
 	max_page_num := 1
@@ -123,14 +122,12 @@ func collectEbay(search_item string) {
 	c_page.Visit(visit_url)
 
 	prod_num := 1
-	//we wanna see the number of prodect
-	prod_num_set := max_prod_num
 
 	c := colly.NewCollector()
 	c.Limit(&colly.LimitRule{DomainGlob: "*.ebay.*", Parallelism: 5})
 
 	c.OnHTML("div[class='s-item__wrapper clearfix']", func(e *colly.HTMLElement) {
-		if prod_num <= prod_num_set {
+		if prod_num <= max_prod_num {
 			//avoid to get a null item
 			if e.ChildText("h3[class='s-item__title']") != "" {
 				fmt.Println(prod_num, ".Name: ", e.ChildText("h3[class='s-item__title']"))
@@ -162,7 +159,7 @@ func collectEbay(search_item string) {
 
 		})
 		visit_url := "https://www.ebay.com/sch/i.html?_nkw=" + search_item + "&_ipg=25&_pgn=" + strconv.Itoa(page_num)
-		if prod_num <= prod_num_set {
+		if prod_num <= max_prod_num {
 			c.Visit(visit_url)
 		} else {
 			break
@@ -173,7 +170,7 @@ func collectEbay(search_item string) {
 			log.Println("Game over")
 		}
 	}
-
+	return nil
 }
 
 func main() {
@@ -181,7 +178,11 @@ func main() {
 	//fmt.Scanln(&prodname)
 	prodname = url.QueryEscape(prodname)
 
-	//collectWatsons(prodname)
-	collectEbay(prodname)
+	// if err := collectWatsons(prodname); err != nil {
+	// 	log.Fatal("collect Watsons fail:", err)
+	// }
+	if err := collectEbay(prodname); err != nil {
+		log.Fatal("collect Ebay fail:", err)
+	}
 
 }
