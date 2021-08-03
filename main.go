@@ -16,7 +16,7 @@ import (
 	"github.com/gocolly/colly"
 )
 
-const max_prod_num = 200
+const max_prod_num = 100
 const max_page_num = 20
 
 func withContextFunc(ctx context.Context, f func()) context.Context {
@@ -124,8 +124,8 @@ func collectEbay(search_item string) error {
 	c.OnHTML("h1[class='srp-controls__count-heading']", func(e *colly.HTMLElement) {
 		re_num := regexp.MustCompile("[^0-9]")
 		//atoi return string_to_int, error
-		max_prod_num, _ := strconv.Atoi(re_num.ReplaceAllString(e.ChildText("span[class='BOLD']"), ""))
-		max_page_num = max_prod_num/25 + 1
+		all_prod_num, _ := strconv.Atoi(re_num.ReplaceAllString(e.ChildText("span[class='BOLD']"), ""))
+		max_page_num = all_prod_num/25 + 1
 	})
 
 	c.OnHTML("div[class='s-item__wrapper clearfix']", func(e *colly.HTMLElement) {
@@ -186,15 +186,15 @@ func collectEbay(search_item string) error {
 }
 
 func main() {
-	prodname := "指甲刀"
+	prodname := "adidas"
 	//fmt.Scanln(&prodname)
 	prodname = url.QueryEscape(prodname)
 
-	// if err := collectWatsons(prodname); err != nil {
-	// 	log.Fatal("collect Watsons fail:", err)
-	// }
-	if err := collectEbay(prodname); err != nil {
-		log.Fatal("collect Ebay fail:", err)
+	if err := collectWatsons(prodname); err != nil {
+		log.Fatal("collect Watsons fail:", err)
 	}
+	// if err := collectEbay(prodname); err != nil {
+	// 	log.Fatal("collect Ebay fail:", err)
+	// }
 
 }
