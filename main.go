@@ -89,8 +89,7 @@ func collectWatsons(prodname string) error {
 		}
 		if count > max_prod_num {
 			break
-		}
-		if !isElement {
+		} else if !isElement {
 			break
 		}
 		if flag {
@@ -178,11 +177,11 @@ func collectEbay(search_item string) {
 }
 
 func main() {
-	prodname := "指甲"
+	prodname := "monitor"
 	//fmt.Scanln(&prodname)
 	prodname = url.QueryEscape(prodname)
 
-	collectWatsons(prodname)
-	//collectEbay(prodname)
+	//collectWatsons(prodname)
+	collectEbay(prodname)
 
 }
