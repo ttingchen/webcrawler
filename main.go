@@ -1,25 +1,29 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"net/url"
+	"os"
+	"os/signal"
 	"regexp"
 	"strconv"
+	"syscall"
+	"time"
 
 	"github.com/gocolly/colly"
 )
 
 func collectWatsons(prodname string) {
 	c := colly.NewCollector(
-		//colly.Debugger(&debug.LogDebugger{}),
-		colly.Async(true),
+	//colly.Debugger(&debug.LogDebugger{}),
 	)
 	c.Limit(&colly.LimitRule{
 		// Set a delay between requests to these domains
-		// Delay: 1 * time.Second,
-		// // Add an additional random delay
-		// RandomDelay: 5 * time.Second,
-		Parallelism: 2,
+		Delay: 1 * time.Second,
+		// Add an additional random delay
+		RandomDelay: 5 * time.Second,
 	})
 
 	count := 0
@@ -34,6 +38,7 @@ func collectWatsons(prodname string) {
 			fmt.Println("Price: ", e.ChildText(".productPrice"))
 			fmt.Printf("Watsons count:%v\n\n", count)
 		})
+		fmt.Println("Total page: ", e.ChildText("e2-total-number-product"))
 
 		//cant find total page
 	})
@@ -47,26 +52,64 @@ func collectWatsons(prodname string) {
 		r.Headers.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36")
 	})
 
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 10; i++ {
 		Url := fmt.Sprintf("https://www.watsons.com.tw/search?text=%v&useDefaultSearch=false&currentPage=%d", prodname, i)
-		//fmt.Println(isValidUrl("Url"))
 		if err := c.Visit(Url); err != nil {
-			fmt.Println("err:", err)
+			fmt.Println(err)
 		}
 	}
-	c.Wait()
+}
+
+func withContextFunc(ctx context.Context, f func()) context.Context {
+	ctx, cancel := context.WithCancel(ctx)
+	go func() {
+		c := make(chan os.Signal)
+		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+		defer signal.Stop(c)
+
+		select {
+		case <-ctx.Done():
+		case <-c:
+			cancel()
+			f()
+		}
+	}()
+
+	return ctx
 }
 
 func collectEbay(search_item string) {
 
+	//get the max number of products to calculate the max number of pages
+	max_page_num := 1
+	c_page := colly.NewCollector()
+	c_page.Limit(&colly.LimitRule{DomainGlob: "*.ebay.*", Parallelism: 5})
+	c_page.OnHTML("h1[class='srp-controls__count-heading']", func(e *colly.HTMLElement) {
+		re_num := regexp.MustCompile("[^0-9]")
+		//atoi return string_to_int, error
+		max_prod_num, _ := strconv.Atoi(re_num.ReplaceAllString(e.ChildText("span[class='BOLD']"), ""))
+		max_page_num = max_prod_num/25 + 1
+	})
+	c_page.OnRequest(func(r *colly.Request) {
+		r.Headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36")
+	})
+	visit_url := "https://www.ebay.com/sch/i.html?_nkw=" + search_item + "&_ipg=25"
+	c_page.Visit(visit_url)
+
 	prod_num := 1
+	//we wanna see the number of prodect
+	prod_num_set := 200
 	//load 1 to page_num pages
-	for page_num := 1; page_num <= 10; page_num++ {
+	finished := make(chan bool)
+	for page_num := 1; page_num <= max_page_num; page_num++ {
+		_ = withContextFunc(context.Background(), func() {
+			log.Println("cancel from ctrl+c event")
+		})
 		c := colly.NewCollector()
 		c.Limit(&colly.LimitRule{DomainGlob: "*.ebay.*", Parallelism: 5})
 
 		c.OnHTML("div[class='s-item__wrapper clearfix']", func(e *colly.HTMLElement) {
-			if prod_num <= 30 {
+			if prod_num <= prod_num_set {
 				//avoid to get a null item
 				if e.ChildText("h3[class='s-item__title']") != "" {
 					fmt.Println(prod_num, ".Name: ", e.ChildText("h3[class='s-item__title']"))
@@ -87,18 +130,24 @@ func collectEbay(search_item string) {
 			r.Headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36")
 		})
 
-		visit_url := "https://www.ebay.com/sch/i.html?_nkw=" + search_item + "&_pgn=" + strconv.Itoa(page_num)
-
-		c.Visit(visit_url)
+		visit_url := "https://www.ebay.com/sch/i.html?_nkw=" + search_item + "&_ipg=25&_pgn=" + strconv.Itoa(page_num)
+		if prod_num <= prod_num_set {
+			c.Visit(visit_url)
+		} else {
+			break
+		}
 	}
+	close(finished)
+	<-finished
+	log.Println("Game over")
 }
 
 func main() {
-	prodname := "指甲貼"
+	prodname := "monitor"
 	//fmt.Scanln(&prodname)
 	prodname = url.QueryEscape(prodname)
 
-	collectWatsons(prodname)
-	//collectEbay(prodname)
+	//collectWatsons(prodname)
+	collectEbay(prodname)
 
 }
