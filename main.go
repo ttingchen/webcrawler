@@ -16,7 +16,7 @@ import (
 	"github.com/gocolly/colly"
 )
 
-const max_prod_num = 100
+const max_prod_num = 500
 const max_page_num = 20
 
 func withContextFunc(ctx context.Context, f func()) context.Context {
@@ -186,7 +186,7 @@ func collectEbay(search_item string) error {
 }
 
 func main() {
-	prodname := "adidas"
+	prodname := "100"
 	//fmt.Scanln(&prodname)
 	prodname = url.QueryEscape(prodname)
 
