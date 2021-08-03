@@ -15,6 +15,8 @@ import (
 	"github.com/gocolly/colly"
 )
 
+const max_prod_num = 200
+
 func collectWatsons(prodname string) {
 	c := colly.NewCollector(
 	//colly.Debugger(&debug.LogDebugger{}),
@@ -38,7 +40,6 @@ func collectWatsons(prodname string) {
 			fmt.Println("Price: ", e.ChildText(".productPrice"))
 			fmt.Printf("Watsons count:%v\n\n", count)
 		})
-		fmt.Println("Total page: ", e.ChildText("e2-total-number-product"))
 
 		//cant find total page
 	})
@@ -53,6 +54,9 @@ func collectWatsons(prodname string) {
 	})
 
 	for i := 0; i < 10; i++ {
+		if count > max_prod_num {
+			break
+		}
 		Url := fmt.Sprintf("https://www.watsons.com.tw/search?text=%v&useDefaultSearch=false&currentPage=%d", prodname, i)
 		if err := c.Visit(Url); err != nil {
 			fmt.Println(err)
@@ -143,11 +147,11 @@ func collectEbay(search_item string) {
 }
 
 func main() {
-	prodname := "monitor"
+	prodname := "指甲"
 	//fmt.Scanln(&prodname)
 	prodname = url.QueryEscape(prodname)
 
-	//collectWatsons(prodname)
-	collectEbay(prodname)
+	collectWatsons(prodname)
+	//collectEbay(prodname)
 
 }
