@@ -16,21 +16,37 @@ import (
 	"github.com/gocolly/colly"
 )
 
-const max_prod_num = 200
+const max_prod_num = 500
 const max_page_num = 20
+
+func withContextFunc(ctx context.Context, f func()) context.Context {
+	ctx, cancel := context.WithCancel(ctx)
+	go func() {
+		c := make(chan os.Signal)
+		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+		defer signal.Stop(c)
+
+		select {
+		case <-ctx.Done():
+		case <-c:
+			cancel()
+			f()
+		}
+	}()
+
+	return ctx
+}
 
 func collectWatsons(prodname string) error {
 	count := 0
 	isElement := false
 	Err := ""
-	c := colly.NewCollector(
-	//colly.Debugger(&debug.LogDebugger{}),
-	)
+	c := colly.NewCollector()
 	c.Limit(&colly.LimitRule{
 		// Set a delay between requests to these domains
 		Delay: 1 * time.Second,
 		// Add an additional random delay
-		RandomDelay: 5 * time.Second,
+		RandomDelay: 55 * time.Second,
 	})
 
 	c.OnHTML("e2-product-list", func(e *colly.HTMLElement) {
@@ -55,7 +71,15 @@ func collectWatsons(prodname string) error {
 		r.Headers.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36")
 	})
 
+	finished := make(chan bool)
+	flag := false
 	for i := 0; i < max_page_num; i++ {
+		_ = withContextFunc(context.Background(), func() {
+			log.Println("cancel from ctrl+c event")
+			flag = true
+
+		})
+
 		isElement = false
 		Url := fmt.Sprintf("https://www.watsons.com.tw/search?text=%v&useDefaultSearch=false&currentPage=%d", prodname, i)
 		if err := c.Visit(Url); err != nil {
@@ -67,29 +91,16 @@ func collectWatsons(prodname string) error {
 		if isElement != true {
 			break
 		}
+		if flag {
+			close(finished)
+			<-finished
+			log.Println("Game over")
+		}
 	}
 	if Err != "" {
 		return errors.New(Err)
 	}
 	return nil
-}
-
-func withContextFunc(ctx context.Context, f func()) context.Context {
-	ctx, cancel := context.WithCancel(ctx)
-	go func() {
-		c := make(chan os.Signal)
-		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-		defer signal.Stop(c)
-
-		select {
-		case <-ctx.Done():
-		case <-c:
-			cancel()
-			f()
-		}
-	}()
-
-	return ctx
 }
 
 func collectEbay(search_item string) {
@@ -112,48 +123,56 @@ func collectEbay(search_item string) {
 
 	prod_num := 1
 	//we wanna see the number of prodect
-	prod_num_set := 200
-	//load 1 to page_num pages
+	prod_num_set := max_prod_num
+
+	c := colly.NewCollector()
+	c.Limit(&colly.LimitRule{DomainGlob: "*.ebay.*", Parallelism: 5})
+
+	c.OnHTML("div[class='s-item__wrapper clearfix']", func(e *colly.HTMLElement) {
+		if prod_num <= prod_num_set {
+			//avoid to get a null item
+			if e.ChildText("h3[class='s-item__title']") != "" {
+				fmt.Println(prod_num, ".Name: ", e.ChildText("h3[class='s-item__title']"))
+				//use regex to remove the useless part of prodlink
+				prod_link := e.ChildAttr("a[class='s-item__link']", "href")
+				re := regexp.MustCompile(`\?(.*)`)
+				fmt.Println("ProdLink: ", re.ReplaceAllString(prod_link, ""))
+				fmt.Println("ImageLink: ", e.ChildAttr("img[class='s-item__image-img']", "src"))
+				fmt.Println("Price: ", e.ChildText("span[class='s-item__price']"))
+				fmt.Println("")
+
+				prod_num += 1
+			}
+
+		}
+	})
+
+	c.OnRequest(func(r *colly.Request) {
+		r.Headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36")
+	})
+
 	finished := make(chan bool)
+	flag := false
+	//load 1 to page_num pages
 	for page_num := 1; page_num <= max_page_num; page_num++ {
 		_ = withContextFunc(context.Background(), func() {
 			log.Println("cancel from ctrl+c event")
+			flag = true
+
 		})
-		c := colly.NewCollector()
-		c.Limit(&colly.LimitRule{DomainGlob: "*.ebay.*", Parallelism: 5})
-
-		c.OnHTML("div[class='s-item__wrapper clearfix']", func(e *colly.HTMLElement) {
-			if prod_num <= prod_num_set {
-				//avoid to get a null item
-				if e.ChildText("h3[class='s-item__title']") != "" {
-					fmt.Println(prod_num, ".Name: ", e.ChildText("h3[class='s-item__title']"))
-					//use regex to remove the useless part of prodlink
-					prod_link := e.ChildAttr("a[class='s-item__link']", "href")
-					re := regexp.MustCompile(`\?(.*)`)
-					fmt.Println("ProdLink: ", re.ReplaceAllString(prod_link, ""))
-					fmt.Println("ImageLink: ", e.ChildAttr("img[class='s-item__image-img']", "src"))
-					fmt.Println("Price: ", e.ChildText("span[class='s-item__price']"))
-					fmt.Println("")
-
-					prod_num += 1
-				}
-			}
-		})
-
-		c.OnRequest(func(r *colly.Request) {
-			r.Headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36")
-		})
-
 		visit_url := "https://www.ebay.com/sch/i.html?_nkw=" + search_item + "&_ipg=25&_pgn=" + strconv.Itoa(page_num)
 		if prod_num <= prod_num_set {
 			c.Visit(visit_url)
 		} else {
 			break
 		}
+		if flag {
+			close(finished)
+			<-finished
+			log.Println("Game over")
+		}
 	}
-	close(finished)
-	<-finished
-	log.Println("Game over")
+
 }
 
 func main() {
@@ -162,7 +181,7 @@ func main() {
 	prodname = url.QueryEscape(prodname)
 
 	if err := collectWatsons(prodname); err != nil {
-		log.Fatal(err)
+		log.Fatal("collect Watsons fail:", err)
 	}
 	//collectEbay(prodname)
 
