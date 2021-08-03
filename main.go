@@ -105,26 +105,22 @@ func collectWatsons(prodname string) error {
 
 func collectEbay(search_item string) error {
 
+	Err := ""
+	prod_num := 1
+
+	c := colly.NewCollector()
+	c.Limit(&colly.LimitRule{
+		DomainGlob:  "*.ebay.*",
+		Parallelism: 5})
+
 	//get the max number of products to calculate the max number of pages
 	max_page_num := 1
-	c_page := colly.NewCollector()
-	c_page.Limit(&colly.LimitRule{DomainGlob: "*.ebay.*", Parallelism: 5})
-	c_page.OnHTML("h1[class='srp-controls__count-heading']", func(e *colly.HTMLElement) {
+	c.OnHTML("h1[class='srp-controls__count-heading']", func(e *colly.HTMLElement) {
 		re_num := regexp.MustCompile("[^0-9]")
 		//atoi return string_to_int, error
 		max_prod_num, _ := strconv.Atoi(re_num.ReplaceAllString(e.ChildText("span[class='BOLD']"), ""))
 		max_page_num = max_prod_num/25 + 1
 	})
-	c_page.OnRequest(func(r *colly.Request) {
-		r.Headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36")
-	})
-	visit_url := "https://www.ebay.com/sch/i.html?_nkw=" + search_item + "&_ipg=25"
-	c_page.Visit(visit_url)
-
-	prod_num := 1
-
-	c := colly.NewCollector()
-	c.Limit(&colly.LimitRule{DomainGlob: "*.ebay.*", Parallelism: 5})
 
 	c.OnHTML("div[class='s-item__wrapper clearfix']", func(e *colly.HTMLElement) {
 		if prod_num <= max_prod_num {
@@ -139,10 +135,14 @@ func collectEbay(search_item string) error {
 				fmt.Println("Price: ", e.ChildText("span[class='s-item__price']"))
 				fmt.Println("")
 
-				prod_num += 1
+				prod_num++
 			}
 
 		}
+	})
+
+	c.OnError(func(r *colly.Response, err error) {
+		Err = fmt.Sprintln("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
 	})
 
 	c.OnRequest(func(r *colly.Request) {
@@ -156,12 +156,15 @@ func collectEbay(search_item string) error {
 		_ = withContextFunc(context.Background(), func() {
 			log.Println("cancel from ctrl+c event")
 			flag = true
-
 		})
+
 		visit_url := "https://www.ebay.com/sch/i.html?_nkw=" + search_item + "&_ipg=25&_pgn=" + strconv.Itoa(page_num)
 		if prod_num <= max_prod_num {
-			c.Visit(visit_url)
+			if err := c.Visit(visit_url); err != nil {
+				log.Println("Url err:", err)
+			}
 		} else {
+			//if we have enough product info, don't load next page
 			break
 		}
 		if flag {
@@ -169,6 +172,9 @@ func collectEbay(search_item string) error {
 			<-finished
 			log.Println("Game over")
 		}
+	}
+	if Err != "" {
+		return errors.New(Err)
 	}
 	return nil
 }
