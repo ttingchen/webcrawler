@@ -101,9 +101,12 @@ func collectEbay(search_item string) {
 	prod_num_set := 200
 	//load 1 to page_num pages
 	finished := make(chan bool)
+	flag := false
 	for page_num := 1; page_num <= max_page_num; page_num++ {
 		_ = withContextFunc(context.Background(), func() {
 			log.Println("cancel from ctrl+c event")
+			flag = true
+
 		})
 		c := colly.NewCollector()
 		c.Limit(&colly.LimitRule{DomainGlob: "*.ebay.*", Parallelism: 5})
@@ -123,6 +126,7 @@ func collectEbay(search_item string) {
 
 					prod_num += 1
 				}
+
 			}
 		})
 
@@ -136,10 +140,13 @@ func collectEbay(search_item string) {
 		} else {
 			break
 		}
+		if flag == true {
+			close(finished)
+			<-finished
+			log.Println("Game over")
+		}
 	}
-	close(finished)
-	<-finished
-	log.Println("Game over")
+
 }
 
 func main() {
