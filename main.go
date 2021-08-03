@@ -130,8 +130,8 @@ func collectEbay(search_item string) error {
 	c.OnHTML("h1[class='srp-controls__count-heading']", func(e *colly.HTMLElement) {
 		re_num := regexp.MustCompile("[^0-9]")
 		//atoi return string_to_int, error
-		max_prod_num, _ := strconv.Atoi(re_num.ReplaceAllString(e.ChildText("span[class='BOLD']"), ""))
-		max_page_num = max_prod_num/25 + 1
+		all_prod_num, _ := strconv.Atoi(re_num.ReplaceAllString(e.ChildText("span[class='BOLD']"), ""))
+		max_page_num = all_prod_num/25 + 1
 	})
 
 	c.OnHTML("div[class='s-item__wrapper clearfix']", func(e *colly.HTMLElement) {
