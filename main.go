@@ -38,13 +38,18 @@ func withContextFunc(ctx context.Context, f func()) context.Context {
 }
 
 func collectWatsons(prodname string) error {
+	// number of the products
 	count := 0
+
+	// check whether there is product in the page
 	isElement := false
+
+	// record the colly error
 	Err := ""
 	c := colly.NewCollector()
 	c.Limit(&colly.LimitRule{
 		// Set a delay between requests to these domains
-		Delay: 1 * time.Second,
+		Delay: 60 * time.Second,
 		// Add an additional random delay
 		RandomDelay: 55 * time.Second,
 	})
@@ -89,6 +94,7 @@ func collectWatsons(prodname string) error {
 			break
 		}
 		if isElement != true {
+			log.Println("No more element on page", i+1)
 			break
 		}
 		if flag {
@@ -180,7 +186,7 @@ func collectEbay(search_item string) error {
 }
 
 func main() {
-	prodname := "monitor"
+	prodname := "指甲刀"
 	//fmt.Scanln(&prodname)
 	prodname = url.QueryEscape(prodname)
 
