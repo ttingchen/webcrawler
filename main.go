@@ -16,9 +16,10 @@ import (
 	"github.com/gocolly/colly"
 )
 
-const max_prod_num = 500
-const max_page_num = 20
+// max product amount for each online store
+const maxProdNum = 500
 
+//check if there is ctrl+c
 func withContextFunc(ctx context.Context, f func()) context.Context {
 	ctx, cancel := context.WithCancel(ctx)
 	go func() {
@@ -37,9 +38,16 @@ func withContextFunc(ctx context.Context, f func()) context.Context {
 	return ctx
 }
 
+// scrape product info from Watsons website
 func collectWatsons(prodname string) error {
 	// number of the products
 	count := 0
+
+	// products per page
+	prodPrePage := 32
+
+	// the needed pages
+	maxPageNum := maxProdNum / prodPrePage
 
 	// check whether there is product in the page
 	isElement := false
@@ -49,21 +57,22 @@ func collectWatsons(prodname string) error {
 	c := colly.NewCollector()
 	c.Limit(&colly.LimitRule{
 		// Set a delay between requests to these domains
-		Delay: 60 * time.Second,
+		Delay: 1 * time.Second,
 		// Add an additional random delay
-		RandomDelay: 55 * time.Second,
+		RandomDelay: 5 * time.Second,
 	})
 
 	c.OnHTML("e2-product-list", func(e *colly.HTMLElement) {
 		e.ForEach("e2-product-tile", func(_ int, e *colly.HTMLElement) {
 			isElement = true
 			count++
+			fmt.Printf("Watsons #%v\n", count)
 			fmt.Println("Name: ", e.ChildText(".productName"))
 			link := "https://www.watsons.com.tw" + e.ChildAttr(".ClickSearchResultEvent_Class.gtmAlink", "href")
 			fmt.Println("ProdLink: ", link)
 			fmt.Println("ImgLink: ", e.ChildAttr("img", "src"))
 			fmt.Println("Price: ", e.ChildText(".productPrice"))
-			fmt.Printf("Watsons count:%v\n\n", count)
+			fmt.Println("")
 		})
 	})
 
@@ -78,20 +87,16 @@ func collectWatsons(prodname string) error {
 
 	finished := make(chan bool)
 	flag := false
-	for i := 0; i < max_page_num; i++ {
+	for i := 0; i < maxPageNum; i++ {
 		_ = withContextFunc(context.Background(), func() {
 			log.Println("cancel from ctrl+c event")
 			flag = true
-
 		})
 
 		isElement = false
 		Url := fmt.Sprintf("https://www.watsons.com.tw/search?text=%v&useDefaultSearch=false&currentPage=%d", prodname, i)
 		if err := c.Visit(Url); err != nil {
 			log.Println("Url err:", err)
-		}
-		if count > max_prod_num {
-			break
 		}
 		if !isElement {
 			log.Println("No more element on page", i+1)
@@ -109,10 +114,11 @@ func collectWatsons(prodname string) error {
 	return nil
 }
 
+// scrape product info from Ebay website
 func collectEbay(search_item string) error {
 
 	Err := ""
-	prod_num := 1
+	prodNum := 1
 
 	c := colly.NewCollector()
 	c.Limit(&colly.LimitRule{
@@ -120,28 +126,29 @@ func collectEbay(search_item string) error {
 		Parallelism: 5})
 
 	//get the max number of products to calculate the max number of pages
-	max_page_num := 1
+	maxPageNum := 1
 	c.OnHTML("h1[class='srp-controls__count-heading']", func(e *colly.HTMLElement) {
-		re_num := regexp.MustCompile("[^0-9]")
+		reNum := regexp.MustCompile("[^0-9]")
 		//atoi return string_to_int, error
-		all_prod_num, _ := strconv.Atoi(re_num.ReplaceAllString(e.ChildText("span[class='BOLD']"), ""))
-		max_page_num = all_prod_num/25 + 1
+		allProdNum, _ := strconv.Atoi(reNum.ReplaceAllString(e.ChildText("span[class='BOLD']"), ""))
+		maxPageNum = allProdNum/25 + 1
 	})
 
 	c.OnHTML("div[class='s-item__wrapper clearfix']", func(e *colly.HTMLElement) {
-		if prod_num <= max_prod_num {
+		if prodNum <= maxProdNum {
 			//avoid to get a null item
 			if e.ChildText("h3[class='s-item__title']") != "" {
-				fmt.Println(prod_num, ".Name: ", e.ChildText("h3[class='s-item__title']"))
+				fmt.Printf("Ebay #%v\n", prodNum)
+				fmt.Println("Name: ", e.ChildText("h3[class='s-item__title']"))
 				//use regex to remove the useless part of prodlink
-				prod_link := e.ChildAttr("a[class='s-item__link']", "href")
+				prodLink := e.ChildAttr("a[class='s-item__link']", "href")
 				re := regexp.MustCompile(`\?(.*)`)
-				fmt.Println("ProdLink: ", re.ReplaceAllString(prod_link, ""))
+				fmt.Println("ProdLink: ", re.ReplaceAllString(prodLink, ""))
 				fmt.Println("ImageLink: ", e.ChildAttr("img[class='s-item__image-img']", "src"))
 				fmt.Println("Price: ", e.ChildText("span[class='s-item__price']"))
 				fmt.Println("")
 
-				prod_num++
+				prodNum++
 			}
 
 		}
@@ -157,16 +164,16 @@ func collectEbay(search_item string) error {
 
 	finished := make(chan bool)
 	flag := false
-	//load 1 to page_num pages
-	for page_num := 1; page_num <= max_page_num; page_num++ {
+	//load 1 to pageNum pages
+	for pageNum := 1; pageNum <= maxPageNum; pageNum++ {
 		_ = withContextFunc(context.Background(), func() {
 			log.Println("cancel from ctrl+c event")
 			flag = true
 		})
 
-		visit_url := "https://www.ebay.com/sch/i.html?_nkw=" + search_item + "&_ipg=25&_pgn=" + strconv.Itoa(page_num)
-		if prod_num <= max_prod_num {
-			if err := c.Visit(visit_url); err != nil {
+		visitUrl := "https://www.ebay.com/sch/i.html?_nkw=" + search_item + "&_ipg=25&_pgn=" + strconv.Itoa(pageNum)
+		if prodNum <= maxProdNum {
+			if err := c.Visit(visitUrl); err != nil {
 				log.Println("Url err:", err)
 			}
 		} else {
@@ -193,8 +200,8 @@ func main() {
 	if err := collectWatsons(prodname); err != nil {
 		log.Fatal("collect Watsons fail:", err)
 	}
-	// if err := collectEbay(prodname); err != nil {
-	// 	log.Fatal("collect Ebay fail:", err)
-	// }
+	if err := collectEbay(prodname); err != nil {
+		log.Fatal("collect Ebay fail:", err)
+	}
 
 }
