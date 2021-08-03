@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -16,8 +17,12 @@ import (
 )
 
 const max_prod_num = 200
+const max_page_num = 20
 
-func collectWatsons(prodname string) {
+func collectWatsons(prodname string) error {
+	count := 0
+	isElement := false
+	Err := ""
 	c := colly.NewCollector(
 	//colly.Debugger(&debug.LogDebugger{}),
 	)
@@ -28,10 +33,9 @@ func collectWatsons(prodname string) {
 		RandomDelay: 5 * time.Second,
 	})
 
-	count := 0
-
 	c.OnHTML("e2-product-list", func(e *colly.HTMLElement) {
 		e.ForEach("e2-product-tile", func(_ int, e *colly.HTMLElement) {
+			isElement = true
 			count++
 			fmt.Println("Name: ", e.ChildText(".productName"))
 			link := "https://www.watsons.com.tw" + e.ChildAttr(".ClickSearchResultEvent_Class.gtmAlink", "href")
@@ -40,12 +44,10 @@ func collectWatsons(prodname string) {
 			fmt.Println("Price: ", e.ChildText(".productPrice"))
 			fmt.Printf("Watsons count:%v\n\n", count)
 		})
-
-		//cant find total page
 	})
 
-	c.OnResponse(func(r *colly.Response) {
-		//fmt.Println(r)
+	c.OnError(func(r *colly.Response, err error) {
+		Err = fmt.Sprintln("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
 	})
 
 	c.OnRequest(func(r *colly.Request) {
@@ -53,15 +55,23 @@ func collectWatsons(prodname string) {
 		r.Headers.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36")
 	})
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < max_page_num; i++ {
+		isElement = false
+		Url := fmt.Sprintf("https://www.watsons.com.tw/search?text=%v&useDefaultSearch=false&currentPage=%d", prodname, i)
+		if err := c.Visit(Url); err != nil {
+			log.Println("Url err:", err)
+		}
 		if count > max_prod_num {
 			break
 		}
-		Url := fmt.Sprintf("https://www.watsons.com.tw/search?text=%v&useDefaultSearch=false&currentPage=%d", prodname, i)
-		if err := c.Visit(Url); err != nil {
-			fmt.Println(err)
+		if isElement != true {
+			break
 		}
 	}
+	if Err != "" {
+		return errors.New(Err)
+	}
+	return nil
 }
 
 func withContextFunc(ctx context.Context, f func()) context.Context {
@@ -151,7 +161,9 @@ func main() {
 	//fmt.Scanln(&prodname)
 	prodname = url.QueryEscape(prodname)
 
-	collectWatsons(prodname)
+	if err := collectWatsons(prodname); err != nil {
+		log.Fatal(err)
+	}
 	//collectEbay(prodname)
 
 }
