@@ -122,14 +122,12 @@ func collectEbay(search_item string) {
 	c_page.Visit(visit_url)
 
 	prod_num := 1
-	//we wanna see the number of prodect
-	prod_num_set := max_prod_num
 
 	c := colly.NewCollector()
 	c.Limit(&colly.LimitRule{DomainGlob: "*.ebay.*", Parallelism: 5})
 
 	c.OnHTML("div[class='s-item__wrapper clearfix']", func(e *colly.HTMLElement) {
-		if prod_num <= prod_num_set {
+		if prod_num <= max_prod_num {
 			//avoid to get a null item
 			if e.ChildText("h3[class='s-item__title']") != "" {
 				fmt.Println(prod_num, ".Name: ", e.ChildText("h3[class='s-item__title']"))
@@ -161,7 +159,7 @@ func collectEbay(search_item string) {
 
 		})
 		visit_url := "https://www.ebay.com/sch/i.html?_nkw=" + search_item + "&_ipg=25&_pgn=" + strconv.Itoa(page_num)
-		if prod_num <= prod_num_set {
+		if prod_num <= max_prod_num {
 			c.Visit(visit_url)
 		} else {
 			break
