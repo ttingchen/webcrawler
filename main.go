@@ -140,7 +140,7 @@ func collectEbay(search_item string) {
 		} else {
 			break
 		}
-		if flag == true {
+		if flag {
 			close(finished)
 			<-finished
 			log.Println("Game over")
