@@ -93,7 +93,7 @@ func collectWatsons(prodname string) error {
 		if count > max_prod_num {
 			break
 		}
-		if isElement != true {
+		if !isElement {
 			log.Println("No more element on page", i+1)
 			break
 		}
