@@ -16,7 +16,7 @@ import (
 	"github.com/gocolly/colly"
 )
 
-const max_prod_num = 500
+const max_prod_num = 200
 const max_page_num = 20
 
 func withContextFunc(ctx context.Context, f func()) context.Context {
