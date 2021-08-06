@@ -47,7 +47,7 @@ func collectWatsons(prodname string) error {
 	prodPerPage := 32
 
 	// the needed pages
-	maxPageNum := max_prod_num / prodPerPage
+	maxPageNum := maxProdNum / prodPerPage
 
 	// check whether there is product in the page
 	isElement := false
