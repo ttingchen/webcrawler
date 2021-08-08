@@ -54,12 +54,17 @@ func collectWatsons(prodname string) error {
 
 	// record the colly error
 	Err := ""
-	c := colly.NewCollector()
+	c := colly.NewCollector(
+		colly.Async(true),
+	)
+
 	c.Limit(&colly.LimitRule{
 		// Set a delay between requests to these domains
 		Delay: 1 * time.Second,
 		// Add an additional random delay
 		RandomDelay: 5 * time.Second,
+
+		Parallelism: 3,
 	})
 
 	c.OnHTML("e2-product-list", func(e *colly.HTMLElement) {
@@ -99,8 +104,8 @@ func collectWatsons(prodname string) error {
 			log.Println("Url err:", err)
 		}
 		if !isElement {
-			log.Println("No more element on page", i+1)
-			break
+			//log.Println("No more element on page", i+1)
+			//break
 		}
 		if flag {
 			close(finished)
@@ -108,6 +113,7 @@ func collectWatsons(prodname string) error {
 			log.Println("Game over")
 		}
 	}
+	c.Wait()
 	if Err != "" {
 		return errors.New(Err)
 	}
@@ -197,9 +203,12 @@ func main() {
 	//fmt.Scanln(&prodname)
 	prodname = url.QueryEscape(prodname)
 
+	//start := time.Now()
 	if err := collectWatsons(prodname); err != nil {
 		log.Fatal("collect Watsons fail:", err)
 	}
+	//fmt.Println(time.Since(start))
+
 	if err := collectEbay(prodname); err != nil {
 		log.Fatal("collect Ebay fail:", err)
 	}
