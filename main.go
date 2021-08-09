@@ -118,7 +118,7 @@ func collectWatsons(prodname string) error {
 		return errors.New(Err)
 	}
 	return nil
-}
+} //testing
 
 // scrape product info from Ebay website
 func collectEbay(search_item string) error {
