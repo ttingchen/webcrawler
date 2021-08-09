@@ -128,6 +128,8 @@ func collectEbay(search_item string) error {
 
 	c := colly.NewCollector()
 	c.Limit(&colly.LimitRule{
+		// Set a delay between requests to these domains
+		Delay:       1 * time.Second,
 		DomainGlob:  "*.ebay.*",
 		Parallelism: 5})
 
