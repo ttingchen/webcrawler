@@ -42,6 +42,13 @@ func Test_collectEbay(t *testing.T) {
 		wantErr bool
 	}{
 		// TODO: Add test cases.
+		{
+			name: "a normal page",
+			args: args{
+				search_item: url.QueryEscape("monitor"),
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
