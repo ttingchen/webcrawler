@@ -125,22 +125,19 @@ func collectEbay(search_item string) error {
 
 	Err := ""
 	prodNum := 1
+	maxPageNum := maxProdNum / 25
 
-	c := colly.NewCollector()
+	c := colly.NewCollector(
+		colly.Async(true),
+	)
 	c.Limit(&colly.LimitRule{
 		// Set a delay between requests to these domains
-		Delay:       1 * time.Second,
-		DomainGlob:  "*.ebay.*",
-		Parallelism: 5})
+		Delay: 1 * time.Second,
+		// Add an additional random delay
+		RandomDelay: 5 * time.Second,
 
-	//get the max number of products to calculate the max number of pages
-	maxPageNum := 1
-	c.OnHTML("h1[class='srp-controls__count-heading']", func(e *colly.HTMLElement) {
-		reNum := regexp.MustCompile("[^0-9]")
-		//atoi return string_to_int, error
-		allProdNum, _ := strconv.Atoi(reNum.ReplaceAllString(e.ChildText("span[class='BOLD']"), ""))
-		maxPageNum = allProdNum/25 + 1
-	})
+		DomainGlob:  "*.ebay.*",
+		Parallelism: 4})
 
 	c.OnHTML("div[class='s-item__wrapper clearfix']", func(e *colly.HTMLElement) {
 		if prodNum <= maxProdNum {
@@ -194,10 +191,12 @@ func collectEbay(search_item string) error {
 			log.Println("Game over")
 		}
 	}
+	c.Wait()
 	if Err != "" {
 		return errors.New(Err)
 	}
 	return nil
+
 }
 
 func main() {
@@ -211,8 +210,10 @@ func main() {
 	}
 	//fmt.Println(time.Since(start))
 
+	//start := time.Now()
 	if err := collectEbay(prodname); err != nil {
 		log.Fatal("collect Ebay fail:", err)
 	}
+	//fmt.Println(time.Since(start))
 
 }
