@@ -137,7 +137,7 @@ func collectEbay(search_item string) error {
 		RandomDelay: 5 * time.Second,
 
 		DomainGlob:  "*.ebay.*",
-		Parallelism: 4})
+		Parallelism: 20})
 
 	c.OnHTML("div[class='s-item__wrapper clearfix']", func(e *colly.HTMLElement) {
 		if prodNum <= maxProdNum {
@@ -210,10 +210,10 @@ func main() {
 	}
 	//fmt.Println(time.Since(start))
 
-	//start := time.Now()
+	// start := time.Now()
 	if err := collectEbay(prodname); err != nil {
 		log.Fatal("collect Ebay fail:", err)
 	}
-	//fmt.Println(time.Since(start))
+	// fmt.Println(time.Since(start))
 
 }
