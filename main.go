@@ -90,7 +90,7 @@ func collectWatsons(prodname string) error {
 		r.Headers.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36")
 	})
 
-	finished := make(chan bool)
+	//finished := make(chan bool)
 	flag := false
 	for i := 0; i < maxPageNum; i++ {
 		_ = withContextFunc(context.Background(), func() {
@@ -108,7 +108,7 @@ func collectWatsons(prodname string) error {
 			//break
 		}
 		if flag {
-			close(finished)
+			//close(finished)
 			log.Println("Game over!!!")
 			break
 		}
@@ -137,7 +137,8 @@ func collectEbay(search_item string) error {
 		RandomDelay: 5 * time.Second,
 
 		DomainGlob:  "*.ebay.*",
-		Parallelism: 20})
+		Parallelism: 20,
+	})
 
 	c.OnHTML("div[class='s-item__wrapper clearfix']", func(e *colly.HTMLElement) {
 		if prodNum <= maxProdNum {
