@@ -109,8 +109,8 @@ func collectWatsons(prodname string) error {
 		}
 		if flag {
 			close(finished)
-			<-finished
-			log.Println("Game over")
+			log.Println("Game over!!!")
+			break
 		}
 	}
 	c.Wait()
@@ -187,8 +187,8 @@ func collectEbay(search_item string) error {
 		}
 		if flag {
 			close(finished)
-			<-finished
-			log.Println("Game over")
+			log.Println("Game over!!!")
+			break
 		}
 	}
 	c.Wait()
