@@ -109,7 +109,7 @@ func collectWatsons(prodname string) error {
 		}
 		if flag {
 			close(finished)
-			log.Println("Game over")
+			log.Println("Game over!!!")
 			break
 		}
 	}
@@ -190,7 +190,7 @@ func collectEbay(search_item string) error {
 		}
 		if flag {
 			close(finished)
-			log.Println("Game over")
+			log.Println("Game over!!!")
 			break
 		}
 	}
