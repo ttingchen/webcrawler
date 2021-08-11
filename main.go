@@ -49,9 +49,6 @@ func collectWatsons(prodname string) error {
 	// the needed pages
 	maxPageNum := maxProdNum / prodPerPage
 
-	// check whether there is product in the page
-	isElement := false
-
 	// record the colly error
 	Err := ""
 	c := colly.NewCollector(
@@ -62,14 +59,13 @@ func collectWatsons(prodname string) error {
 		// Set a delay between requests to these domains
 		Delay: 1 * time.Second,
 		// Add an additional random delay
-		RandomDelay: 5 * time.Second,
+		RandomDelay: 1 * time.Second,
 
 		Parallelism: 3,
 	})
 
 	c.OnHTML("e2-product-list", func(e *colly.HTMLElement) {
 		e.ForEach("e2-product-tile", func(_ int, e *colly.HTMLElement) {
-			isElement = true
 			count++
 			fmt.Printf("Watsons #%v\n", count)
 			fmt.Println("Name: ", e.ChildText(".productName"))
@@ -86,11 +82,9 @@ func collectWatsons(prodname string) error {
 	})
 
 	c.OnRequest(func(r *colly.Request) {
-		//fmt.Println("UserAgent", r.Headers.Get("User-Agent"))
 		r.Headers.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36")
 	})
 
-	//finished := make(chan bool)
 	flag := false
 	for i := 0; i < maxPageNum; i++ {
 		_ = withContextFunc(context.Background(), func() {
@@ -98,17 +92,11 @@ func collectWatsons(prodname string) error {
 			flag = true
 		})
 
-		isElement = false
 		Url := fmt.Sprintf("https://www.watsons.com.tw/search?text=%v&useDefaultSearch=false&currentPage=%d", prodname, i)
 		if err := c.Visit(Url); err != nil {
 			log.Println("Url err:", err)
 		}
-		if !isElement {
-			//log.Println("No more element on page", i+1)
-			//break
-		}
 		if flag {
-			//close(finished)
 			log.Println("Game over!!!")
 			break
 		}
@@ -118,7 +106,7 @@ func collectWatsons(prodname string) error {
 		return errors.New(Err)
 	}
 	return nil
-} //testing test
+}
 
 // scrape product info from Ebay website
 func collectEbay(search_item string) error {
@@ -168,7 +156,6 @@ func collectEbay(search_item string) error {
 		r.Headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36")
 	})
 
-	finished := make(chan bool)
 	flag := false
 	//load 1 to pageNum pages
 	for pageNum := 1; pageNum <= maxPageNum; pageNum++ {
@@ -187,7 +174,6 @@ func collectEbay(search_item string) error {
 			break
 		}
 		if flag {
-			close(finished)
 			log.Println("Game over!!!")
 			break
 		}
@@ -206,12 +192,12 @@ func main() {
 	prodname = url.QueryEscape(prodname)
 
 	//start := time.Now()
-	if err := collectWatsons(prodname); err != nil {
-		log.Fatal("collect Watsons fail:", err)
-	}
+	// if err := collectWatsons(prodname); err != nil {
+	// 	log.Fatal("collect Watsons fail:", err)
+	// }
 	//fmt.Println(time.Since(start))
 
-	// start := time.Now()
+	// // start := time.Now()
 	if err := collectEbay(prodname); err != nil {
 		log.Fatal("collect Ebay fail:", err)
 	}
