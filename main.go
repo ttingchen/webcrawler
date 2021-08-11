@@ -170,7 +170,6 @@ func collectEbay(search_item string, flag *bool) error {
 		}
 	}
 	c.Wait()
-
 	if Err != "" {
 		return errors.New(Err)
 	}
