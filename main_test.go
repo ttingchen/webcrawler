@@ -6,8 +6,10 @@ import (
 )
 
 func Test_collectWatsons(t *testing.T) {
+	testf := true
 	type args struct {
 		prodname string
+		flag     *bool
 	}
 	tests := []struct {
 		name    string
@@ -19,13 +21,14 @@ func Test_collectWatsons(t *testing.T) {
 			name: "a normal page",
 			args: args{
 				prodname: url.QueryEscape("指甲"),
+				flag:     &testf,
 			},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := collectWatsons(tt.args.prodname); (err != nil) != tt.wantErr {
+			if err := collectWatsons(tt.args.prodname, tt.args.flag); (err != nil) != tt.wantErr {
 				t.Errorf("collectWatsons() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -33,8 +36,10 @@ func Test_collectWatsons(t *testing.T) {
 }
 
 func Test_collectEbay(t *testing.T) {
+	testf := true
 	type args struct {
-		search_item string
+		prodname string
+		flag     *bool
 	}
 	tests := []struct {
 		name    string
@@ -45,15 +50,16 @@ func Test_collectEbay(t *testing.T) {
 		{
 			name: "a normal page",
 			args: args{
-				search_item: url.QueryEscape("monitor"),
+				prodname: url.QueryEscape("hello"),
+				flag:     &testf,
 			},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := collectEbay(tt.args.search_item); (err != nil) != tt.wantErr {
-				t.Errorf("collectEbay() error = %v, wantErr %v", err, tt.wantErr)
+			if err := collectWatsons(tt.args.prodname, tt.args.flag); (err != nil) != tt.wantErr {
+				t.Errorf("collectWatsons() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
