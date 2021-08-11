@@ -128,7 +128,7 @@ func collectEbay(search_item string) error {
 	maxPageNum := maxProdNum / 25
 
 	c := colly.NewCollector(
-		colly.Async(true),
+	// colly.Async(true),
 	)
 	c.Limit(&colly.LimitRule{
 		// Set a delay between requests to these domains
@@ -201,8 +201,8 @@ func collectEbay(search_item string) error {
 }
 
 func main() {
-	prodname := "100"
-	//fmt.Scanln(&prodname)
+	prodname := ""
+	fmt.Scanln(&prodname)
 	prodname = url.QueryEscape(prodname)
 
 	//start := time.Now()
