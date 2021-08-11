@@ -57,11 +57,11 @@ func collectWatsons(prodname string, flag *bool) error {
 
 	c.Limit(&colly.LimitRule{
 		// Set a delay between requests to these domains
-		Delay: 10 * time.Second,
+		Delay: 1 * time.Second,
 		// Add an additional random delay
-		RandomDelay: 10 * time.Second,
+		RandomDelay: 3 * time.Second,
 
-		Parallelism: 1,
+		Parallelism: 3,
 	})
 
 	c.OnHTML("e2-product-list", func(e *colly.HTMLElement) {
@@ -106,10 +106,6 @@ func collectWatsons(prodname string, flag *bool) error {
 
 // scrape product info from Ebay website
 func collectEbay(search_item string, flag *bool) error {
-	if *flag {
-		log.Println("Quit from ebay collector")
-		return nil
-	}
 
 	Err := ""
 	prodNum := 1
@@ -122,10 +118,10 @@ func collectEbay(search_item string, flag *bool) error {
 		// Set a delay between requests to these domains
 		Delay: 1 * time.Second,
 		// Add an additional random delay
-		RandomDelay: 5 * time.Second,
+		RandomDelay: 3 * time.Second,
 
 		DomainGlob:  "*.ebay.*",
-		Parallelism: 2,
+		Parallelism: 10,
 	})
 
 	c.OnHTML("div[class='s-item__wrapper clearfix']", func(e *colly.HTMLElement) {
@@ -190,8 +186,8 @@ func main() {
 		flag = true
 	})
 
-	prodname := "100"
-	//fmt.Scanln(&prodname)
+	prodname := ""
+	fmt.Scanln(&prodname)
 	prodname = url.QueryEscape(prodname)
 
 	//start := time.Now()
