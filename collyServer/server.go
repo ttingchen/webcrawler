@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"regexp"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -130,14 +131,13 @@ func collectEbay(w http.ResponseWriter, search_item string, flag *bool) error {
 			//avoid to get a null item
 			if e.ChildText("h3[class='s-item__title']") != "" {
 				fmt.Fprintf(w, "Ebay #%v\n", prodNum)
-				fmt.Fprintf(w, "Name: ", e.ChildText("h3[class='s-item__title']"), "\n")
+				fmt.Fprintf(w, "Name: %v\n", e.ChildText("h3[class='s-item__title']"))
 				//use regex to remove the useless part of prodlink
 				prodLink := e.ChildAttr("a[class='s-item__link']", "href")
 				re := regexp.MustCompile(`\?(.*)`)
-				fmt.Fprintf(w, "ProdLink: ", re.ReplaceAllString(prodLink, ""), "\n")
-				fmt.Fprintf(w, "ImageLink: ", e.ChildAttr("img[class='s-item__image-img']", "src"), "\n")
-				fmt.Fprintf(w, "Price: ", e.ChildText("span[class='s-item__price']"), "\n")
-				fmt.Fprintf(w, "\n")
+				fmt.Fprintf(w, "ProdLink: %v\n", re.ReplaceAllString(prodLink, ""))
+				fmt.Fprintf(w, "ImageLink: %v\n", e.ChildAttr("img[class='s-item__image-img']", "src"))
+				fmt.Fprintf(w, "Price: %v\n\n", e.ChildText("span[class='s-item__price']"))
 
 				prodNum++
 			}
@@ -179,25 +179,30 @@ func collectEbay(w http.ResponseWriter, search_item string, flag *bool) error {
 }
 
 func collyCrawler(w http.ResponseWriter, r *http.Request) {
-	// // for graceful shut down
+	// for graceful shut down
 	flag := false
-	// _ = withContextFunc(context.Background(), func() {
-	// 	log.Println("cancel from ctrl+c event")
-	// 	flag = true
-	// })
+	_ = withContextFunc(context.Background(), func() {
+		log.Println("cancel from ctrl+c event")
+		flag = true
+	})
 
-	// prodname := ""
-	// fmt.Scanln(&prodname)
-	// prodname = url.QueryEscape(prodname)
-
-	if err := collectEbay(w, url.QueryEscape("100"), &flag); err != nil {
-		log.Fatal("collect Ebay fail:", err)
+	r.ParseForm()
+	for k, v := range r.Form {
+		fmt.Println("key:", k)
+		fmt.Println("val:", strings.Join(v, ""))
+		prodname := strings.Join(v, "")
+		if err := collectEbay(w, url.QueryEscape(prodname), &flag); err != nil {
+			log.Fatal("collect Ebay fail:", err)
+		}
 	}
 }
 
 func main() {
-	http.HandleFunc("/", collyCrawler)       //設定存取的路由
-	err := http.ListenAndServe(":9090", nil) //設定監聽的埠
+
+	//usage: http://localhost:9090/?url_long=keyword
+	http.HandleFunc("/", collyCrawler)
+	//set port number
+	err := http.ListenAndServe(":9090", nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
