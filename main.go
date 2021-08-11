@@ -90,13 +90,16 @@ func collectWatsons(prodname string) error {
 		r.Headers.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36")
 	})
 
-	//finished := make(chan bool)
 	flag := false
+	_ = withContextFunc(context.Background(), func() {
+		log.Println("cancel from ctrl+c event")
+		flag = true
+	})
+
 	for i := 0; i < maxPageNum; i++ {
-		_ = withContextFunc(context.Background(), func() {
-			log.Println("cancel from ctrl+c event")
-			flag = true
-		})
+		if flag {
+			break
+		}
 
 		isElement = false
 		Url := fmt.Sprintf("https://www.watsons.com.tw/search?text=%v&useDefaultSearch=false&currentPage=%d", prodname, i)
@@ -107,18 +110,17 @@ func collectWatsons(prodname string) error {
 			//log.Println("No more element on page", i+1)
 			//break
 		}
-		if flag {
-			//close(finished)
-			log.Println("Game over!!!")
-			break
-		}
+
 	}
 	c.Wait()
+	if flag {
+		log.Println("Game over!!!")
+	}
 	if Err != "" {
 		return errors.New(Err)
 	}
 	return nil
-} //testing test
+}
 
 // scrape product info from Ebay website
 func collectEbay(search_item string) error {
@@ -128,7 +130,7 @@ func collectEbay(search_item string) error {
 	maxPageNum := maxProdNum / 25
 
 	c := colly.NewCollector(
-	// colly.Async(true),
+		colly.Async(true),
 	)
 	c.Limit(&colly.LimitRule{
 		// Set a delay between requests to these domains
@@ -168,14 +170,17 @@ func collectEbay(search_item string) error {
 		r.Headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36")
 	})
 
-	//finished := make(chan bool)
 	flag := false
+	_ = withContextFunc(context.Background(), func() {
+		log.Println("cancel from ctrl+c event")
+		flag = true
+	})
+
 	//load 1 to pageNum pages
 	for pageNum := 1; pageNum <= maxPageNum; pageNum++ {
-		_ = withContextFunc(context.Background(), func() {
-			log.Println("cancel from ctrl+c event")
-			flag = true
-		})
+		if flag {
+			break
+		}
 
 		visitUrl := "https://www.ebay.com/sch/i.html?_nkw=" + search_item + "&_ipg=25&_pgn=" + strconv.Itoa(pageNum)
 		if prodNum <= maxProdNum {
@@ -186,13 +191,11 @@ func collectEbay(search_item string) error {
 			//if we have enough product info, don't load next page
 			break
 		}
-		if flag {
-			//close(finished)
-			log.Println("Game over!!!")
-			break
-		}
 	}
 	c.Wait()
+	if flag {
+		log.Println("Game over!!!")
+	}
 	if Err != "" {
 		return errors.New(Err)
 	}
@@ -206,9 +209,9 @@ func main() {
 	prodname = url.QueryEscape(prodname)
 
 	//start := time.Now()
-	if err := collectWatsons(prodname); err != nil {
-		log.Fatal("collect Watsons fail:", err)
-	}
+	// if err := collectWatsons(prodname); err != nil {
+	// 	log.Fatal("collect Watsons fail:", err)
+	// }
 	//fmt.Println(time.Since(start))
 
 	// start := time.Now()
