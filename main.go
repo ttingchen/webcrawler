@@ -57,11 +57,11 @@ func collectWatsons(prodname string, flag *bool) error {
 
 	c.Limit(&colly.LimitRule{
 		// Set a delay between requests to these domains
-		Delay: 1 * time.Second,
+		Delay: 10 * time.Second,
 		// Add an additional random delay
-		RandomDelay: 1 * time.Second,
+		RandomDelay: 10 * time.Second,
 
-		Parallelism: 3,
+		Parallelism: 1,
 	})
 
 	c.OnHTML("e2-product-list", func(e *colly.HTMLElement) {
@@ -97,6 +97,7 @@ func collectWatsons(prodname string, flag *bool) error {
 		}
 	}
 	c.Wait()
+
 	if Err != "" {
 		return errors.New(Err)
 	}
@@ -124,7 +125,7 @@ func collectEbay(search_item string, flag *bool) error {
 		RandomDelay: 5 * time.Second,
 
 		DomainGlob:  "*.ebay.*",
-		Parallelism: 20,
+		Parallelism: 2,
 	})
 
 	c.OnHTML("div[class='s-item__wrapper clearfix']", func(e *colly.HTMLElement) {
