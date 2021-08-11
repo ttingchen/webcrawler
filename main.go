@@ -39,7 +39,7 @@ func withContextFunc(ctx context.Context, f func()) context.Context {
 }
 
 // scrape product info from Watsons website
-func collectWatsons(prodname string) error {
+func collectWatsons(prodname string, flag bool) error {
 	// number of the products
 	count := 0
 
@@ -57,11 +57,11 @@ func collectWatsons(prodname string) error {
 
 	c.Limit(&colly.LimitRule{
 		// Set a delay between requests to these domains
-		Delay: 1 * time.Second,
+		Delay: 10 * time.Second,
 		// Add an additional random delay
-		RandomDelay: 1 * time.Second,
+		RandomDelay: 10 * time.Second,
 
-		Parallelism: 3,
+		Parallelism: 1,
 	})
 
 	c.OnHTML("e2-product-list", func(e *colly.HTMLElement) {
@@ -85,23 +85,20 @@ func collectWatsons(prodname string) error {
 		r.Headers.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36")
 	})
 
-	flag := false
 	for i := 0; i < maxPageNum; i++ {
-		_ = withContextFunc(context.Background(), func() {
-			log.Println("cancel from ctrl+c event")
-			flag = true
-		})
 
 		Url := fmt.Sprintf("https://www.watsons.com.tw/search?text=%v&useDefaultSearch=false&currentPage=%d", prodname, i)
 		if err := c.Visit(Url); err != nil {
 			log.Println("Url err:", err)
 		}
+
 		if flag {
 			log.Println("Game over!!!")
 			break
 		}
 	}
 	c.Wait()
+
 	if Err != "" {
 		return errors.New(Err)
 	}
@@ -109,7 +106,7 @@ func collectWatsons(prodname string) error {
 }
 
 // scrape product info from Ebay website
-func collectEbay(search_item string) error {
+func collectEbay(search_item string, flag chan bool) error {
 
 	Err := ""
 	prodNum := 1
@@ -125,7 +122,7 @@ func collectEbay(search_item string) error {
 		RandomDelay: 5 * time.Second,
 
 		DomainGlob:  "*.ebay.*",
-		Parallelism: 20,
+		Parallelism: 2,
 	})
 
 	c.OnHTML("div[class='s-item__wrapper clearfix']", func(e *colly.HTMLElement) {
@@ -156,13 +153,15 @@ func collectEbay(search_item string) error {
 		r.Headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36")
 	})
 
-	flag := false
 	//load 1 to pageNum pages
 	for pageNum := 1; pageNum <= maxPageNum; pageNum++ {
-		_ = withContextFunc(context.Background(), func() {
-			log.Println("cancel from ctrl+c event")
-			flag = true
-		})
+		select {
+		case flag<-:
+			log.Println("Game over!!!")
+			goto HERE
+			break
+		default:
+		}
 
 		visitUrl := "https://www.ebay.com/sch/i.html?_nkw=" + search_item + "&_ipg=25&_pgn=" + strconv.Itoa(pageNum)
 		if prodNum <= maxProdNum {
@@ -173,11 +172,10 @@ func collectEbay(search_item string) error {
 			//if we have enough product info, don't load next page
 			break
 		}
-		if flag {
-			log.Println("Game over!!!")
-			break
-		}
+
 	}
+
+HERE:
 	c.Wait()
 	if Err != "" {
 		return errors.New(Err)
@@ -187,20 +185,26 @@ func collectEbay(search_item string) error {
 }
 
 func main() {
-	prodname := "100"
-	//fmt.Scanln(&prodname)
+	prodname := ""
+	fmt.Scanln(&prodname)
 	prodname = url.QueryEscape(prodname)
 
+	flag := make(chan bool)
+	// function for shutdown
+	_ = withContextFunc(context.Background(), func() {
+		log.Println("cancel from ctrl+c event")
+		flag <- true
+	})
+
 	//start := time.Now()
-	// if err := collectWatsons(prodname); err != nil {
+	// if err := collectWatsons(prodname, flag); err != nil {
 	// 	log.Fatal("collect Watsons fail:", err)
 	// }
-	//fmt.Println(time.Since(start))
 
-	// // start := time.Now()
-	if err := collectEbay(prodname); err != nil {
+	if err := collectEbay(prodname, flag); err != nil {
 		log.Fatal("collect Ebay fail:", err)
 	}
+
 	// fmt.Println(time.Since(start))
 
 }
