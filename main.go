@@ -168,7 +168,7 @@ func collectEbay(search_item string) error {
 		r.Headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36")
 	})
 
-	finished := make(chan bool)
+	//finished := make(chan bool)
 	flag := false
 	//load 1 to pageNum pages
 	for pageNum := 1; pageNum <= maxPageNum; pageNum++ {
@@ -187,7 +187,7 @@ func collectEbay(search_item string) error {
 			break
 		}
 		if flag {
-			close(finished)
+			//close(finished)
 			log.Println("Game over!!!")
 			break
 		}
