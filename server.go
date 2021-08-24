@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -11,7 +12,6 @@ import (
 	"os/signal"
 	"regexp"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -20,6 +20,32 @@ import (
 
 // max product amount for each online store
 const maxProdNum = 500
+
+func main() {
+	//usage: http://localhost:9090/?search=keyword
+	http.HandleFunc("/", collyCrawler)
+	//set port number
+	err := http.ListenAndServe(":9090", nil)
+	if err != nil {
+		log.Fatal("ListenAndServe: ", err)
+	}
+}
+
+func collyCrawler(w http.ResponseWriter, r *http.Request) {
+	// for graceful shut down
+	flag := false
+	_ = withContextFunc(context.Background(), func() {
+		log.Println("cancel from ctrl+c event")
+		flag = true
+	})
+
+	prodname := r.URL.Query().Get("search")
+	err := collectEbay(w, r, url.QueryEscape(prodname), &flag)
+	if err != nil {
+		log.Fatal("collect Ebay fail:", err)
+	}
+
+}
 
 //check if there is ctrl+c
 func withContextFunc(ctx context.Context, f func()) context.Context {
@@ -40,18 +66,14 @@ func withContextFunc(ctx context.Context, f func()) context.Context {
 	return ctx
 }
 
-// scrape product info from Watsons website
-func collectWatsons(w http.ResponseWriter, prodname string, flag *bool) error {
-	// number of the products
-	count := 0
+// scrape product info from Ebay website
+func collectEbay(w http.ResponseWriter, r *http.Request, search_item string, flag *bool) error {
 
-	// products per page
-	prodPerPage := 32
+	prodNum := 1
 
-	// the needed pages
+	prodPerPage := 25
 	maxPageNum := maxProdNum / prodPerPage
 
-	// record the colly error
 	Err := ""
 	c := colly.NewCollector(
 		colly.Async(true),
@@ -63,85 +85,45 @@ func collectWatsons(w http.ResponseWriter, prodname string, flag *bool) error {
 		// Add an additional random delay
 		RandomDelay: 3 * time.Second,
 
+		// DomainGlob:  "*.ebay.*",
 		Parallelism: 3,
-	})
-
-	c.OnHTML("e2-product-list", func(e *colly.HTMLElement) {
-		e.ForEach("e2-product-tile", func(_ int, e *colly.HTMLElement) {
-			count++
-			fmt.Printf("Watsons #%v\n", count)
-			fmt.Println("Name: ", e.ChildText(".productName"))
-			link := "https://www.watsons.com.tw" + e.ChildAttr(".ClickSearchResultEvent_Class.gtmAlink", "href")
-			fmt.Println("ProdLink: ", link)
-			fmt.Println("ImgLink: ", e.ChildAttr("img", "src"))
-			fmt.Println("Price: ", e.ChildText(".productPrice"))
-			fmt.Println("")
-		})
-	})
-
-	c.OnError(func(r *colly.Response, err error) {
-		Err = fmt.Sprintln("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
-	})
-
-	c.OnRequest(func(r *colly.Request) {
-		r.Headers.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36")
-	})
-
-	for i := 0; i < maxPageNum; i++ {
-		if *flag {
-			log.Println("Quit from watsons collector")
-			return nil
-		}
-
-		Url := fmt.Sprintf("https://www.watsons.com.tw/search?text=%v&useDefaultSearch=false&currentPage=%d", prodname, i)
-		if err := c.Visit(Url); err != nil {
-			log.Println("Url err:", err)
-		}
-	}
-	c.Wait()
-
-	if Err != "" {
-		return errors.New(Err)
-	}
-	return nil
-}
-
-// scrape product info from Ebay website
-func collectEbay(w http.ResponseWriter, search_item string, flag *bool) error {
-
-	Err := ""
-	prodNum := 1
-	maxPageNum := maxProdNum / 25
-
-	c := colly.NewCollector(
-		colly.Async(true),
-	)
-	c.Limit(&colly.LimitRule{
-		// Set a delay between requests to these domains
-		Delay: 1 * time.Second,
-		// Add an additional random delay
-		RandomDelay: 3 * time.Second,
-
-		DomainGlob:  "*.ebay.*",
-		Parallelism: 10,
 	})
 
 	c.OnHTML("div[class='s-item__wrapper clearfix']", func(e *colly.HTMLElement) {
 		if prodNum <= maxProdNum {
 			//avoid to get a null item
 			if e.ChildText("h3[class='s-item__title']") != "" {
-				fmt.Fprintf(w, "Ebay #%v\n", prodNum)
-				fmt.Fprintf(w, "Name: %v\n", e.ChildText("h3[class='s-item__title']"))
 				//use regex to remove the useless part of prodlink
-				prodLink := e.ChildAttr("a[class='s-item__link']", "href")
 				re := regexp.MustCompile(`\?(.*)`)
-				fmt.Fprintf(w, "ProdLink: %v\n", re.ReplaceAllString(prodLink, ""))
-				fmt.Fprintf(w, "ImageLink: %v\n", e.ChildAttr("img[class='s-item__image-img']", "src"))
-				fmt.Fprintf(w, "Price: %v\n\n", e.ChildText("span[class='s-item__price']"))
+				prodName := e.ChildText("h3[class='s-item__title']")
+				prodLink := e.ChildAttr("a[class='s-item__link']", "href")
+				prodLinkR := re.ReplaceAllString(prodLink, "")
+				prodImgLink := e.ChildAttr("img[class='s-item__image-img']", "src")
+				prodPrice := e.ChildText("span[class='s-item__price']")
+
+				// fmt.Fprintf(w, "Ebay #%v\n", prodNum)
+				// fmt.Fprintf(w, "Name: %v\n", prodName)
+				// fmt.Fprintf(w, "ProdLink: %v\n", prodLinkR)
+				// fmt.Fprintf(w, "ImageLink: %v\n", prodImgLink)
+				// fmt.Fprintf(w, "Price: %v\n", prodPrice)
+				fmt.Fprintf(w, "#%v: json.NewEncode:\n", prodNum)
+
+				result := Product{prodName, prodPrice, prodImgLink, prodLinkR}
+				if err := json.NewEncoder(w).Encode(&result); err == nil {
+					fmt.Fprintf(w, "")
+				}
+				fmt.Fprintf(w, "\n")
+
+				json.NewDecoder(r.Body).Decode(&result)
+				fmt.Println("Ebay #", prodNum, ": ")
+				fmt.Println(result.Name)
+				fmt.Println(result.URL)
+				fmt.Println(result.Image)
+				fmt.Println(result.Price)
+				fmt.Println()
 
 				prodNum++
 			}
-
 		}
 	})
 
@@ -178,32 +160,9 @@ func collectEbay(w http.ResponseWriter, search_item string, flag *bool) error {
 
 }
 
-func collyCrawler(w http.ResponseWriter, r *http.Request) {
-	// for graceful shut down
-	flag := false
-	_ = withContextFunc(context.Background(), func() {
-		log.Println("cancel from ctrl+c event")
-		flag = true
-	})
-
-	r.ParseForm()
-	for k, v := range r.Form {
-		fmt.Println("key:", k)
-		fmt.Println("val:", strings.Join(v, ""))
-		prodname := strings.Join(v, "")
-		if err := collectEbay(w, url.QueryEscape(prodname), &flag); err != nil {
-			log.Fatal("collect Ebay fail:", err)
-		}
-	}
-}
-
-func main() {
-
-	//usage: http://localhost:9090/?url_long=keyword
-	http.HandleFunc("/", collyCrawler)
-	//set port number
-	err := http.ListenAndServe(":9090", nil)
-	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
-	}
+type Product struct {
+	Name  string `json:"name"`
+	Price string `json:"price"`
+	Image string `json:"image_link"`
+	URL   string `json:"url"`
 }
