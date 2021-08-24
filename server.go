@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,7 +16,9 @@ import (
 )
 
 // max product amount for each online store
-const maxProdNum = 500
+const (
+	maxProdNum = 500
+)
 
 func main() {
 	//usage: http://localhost:9090/?search=keyword
@@ -28,8 +31,14 @@ func main() {
 }
 
 func collyCrawler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	prodname := r.URL.Query().Get("search")
-	searchResult, err := collectEbay(w, r, url.QueryEscape(prodname))
+	if prodname == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	searchResult, err := collectEbay(ctx, w, r, url.QueryEscape(prodname))
 	if err != nil {
 		log.Fatal("collect Ebay fail:", err)
 	}
@@ -46,7 +55,7 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 }
 
 // scrape product info from Ebay website
-func collectEbay(w http.ResponseWriter, r *http.Request, search_item string) (*[maxProdNum + 100]Product, error) {
+func collectEbay(ctx context.Context, w http.ResponseWriter, r *http.Request, search_item string) (*[maxProdNum + 100]Product, error) {
 
 	prodNum := 1
 	prodPerPage := 25
@@ -56,6 +65,7 @@ func collectEbay(w http.ResponseWriter, r *http.Request, search_item string) (*[
 	Err := ""
 	c := colly.NewCollector(
 		colly.Async(true),
+		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36"),
 	)
 
 	c.Limit(&colly.LimitRule{
@@ -111,7 +121,11 @@ func collectEbay(w http.ResponseWriter, r *http.Request, search_item string) (*[
 	})
 
 	c.OnRequest(func(r *colly.Request) {
-		r.Headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36")
+		select {
+		case <-ctx.Done(): // 如果 canceled
+			r.Abort() // 結束 request
+		default: // 要有 default，不然 select {} 會卡住
+		}
 	})
 
 	//load 1 to pageNum pages
