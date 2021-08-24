@@ -1,18 +1,14 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
-	"os"
-	"os/signal"
 	"regexp"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/gocolly/colly"
@@ -32,47 +28,30 @@ func main() {
 }
 
 func collyCrawler(w http.ResponseWriter, r *http.Request) {
-	// for graceful shut down
-	flag := false
-	_ = withContextFunc(context.Background(), func() {
-		log.Println("cancel from ctrl+c event")
-		flag = true
-	})
-
 	prodname := r.URL.Query().Get("search")
-	err := collectEbay(w, r, url.QueryEscape(prodname), &flag)
+	searchResult, err := collectEbay(w, r, url.QueryEscape(prodname))
 	if err != nil {
 		log.Fatal("collect Ebay fail:", err)
+	}
+	for i := 1; i <= maxProdNum; i++ {
+		json.NewDecoder(r.Body).Decode(&searchResult[i])
+		fmt.Println("Ebay #", i, ": ")
+		fmt.Println(searchResult[i].Name)
+		fmt.Println(searchResult[i].URL)
+		fmt.Println(searchResult[i].Image)
+		fmt.Println(searchResult[i].Price)
+		fmt.Println()
 	}
 
 }
 
-//check if there is ctrl+c
-func withContextFunc(ctx context.Context, f func()) context.Context {
-	ctx, cancel := context.WithCancel(ctx)
-	go func() {
-		c := make(chan os.Signal)
-		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-		defer signal.Stop(c)
-
-		select {
-		case <-ctx.Done():
-		case <-c:
-			cancel()
-			f()
-		}
-	}()
-
-	return ctx
-}
-
 // scrape product info from Ebay website
-func collectEbay(w http.ResponseWriter, r *http.Request, search_item string, flag *bool) error {
+func collectEbay(w http.ResponseWriter, r *http.Request, search_item string) (*[maxProdNum + 100]Product, error) {
 
 	prodNum := 1
-
 	prodPerPage := 25
 	maxPageNum := maxProdNum / prodPerPage
+	var result [maxProdNum + 100]Product
 
 	Err := ""
 	c := colly.NewCollector(
@@ -108,19 +87,19 @@ func collectEbay(w http.ResponseWriter, r *http.Request, search_item string, fla
 				// fmt.Fprintf(w, "Price: %v\n", prodPrice)
 				fmt.Fprintf(w, "#%v: json.NewEncode:\n", prodNum)
 
-				result := Product{prodName, prodPrice, prodImgLink, prodLinkR}
-				if err := json.NewEncoder(w).Encode(&result); err == nil {
+				result[prodNum] = Product{prodName, prodPrice, prodImgLink, prodLinkR}
+				if err := json.NewEncoder(w).Encode(&result[prodNum]); err == nil {
 					fmt.Fprintf(w, "")
 				}
 				fmt.Fprintf(w, "\n")
 
-				json.NewDecoder(r.Body).Decode(&result)
-				fmt.Println("Ebay #", prodNum, ": ")
-				fmt.Println(result.Name)
-				fmt.Println(result.URL)
-				fmt.Println(result.Image)
-				fmt.Println(result.Price)
-				fmt.Println()
+				// json.NewDecoder(r.Body).Decode(&result)
+				// fmt.Println("Ebay #", prodNum, ": ")
+				// fmt.Println(result[prodNum].Name)
+				// fmt.Println(result[prodNum].URL)
+				// fmt.Println(result[prodNum].Image)
+				// fmt.Println(result[prodNum].Price)
+				// fmt.Println()
 
 				prodNum++
 			}
@@ -137,10 +116,6 @@ func collectEbay(w http.ResponseWriter, r *http.Request, search_item string, fla
 
 	//load 1 to pageNum pages
 	for pageNum := 1; pageNum <= maxPageNum; pageNum++ {
-		if *flag {
-			log.Println("Quit from ebay collector")
-			return nil
-		}
 
 		visitUrl := "https://www.ebay.com/sch/i.html?_nkw=" + search_item + "&_ipg=25&_pgn=" + strconv.Itoa(pageNum)
 		if prodNum <= maxProdNum {
@@ -154,10 +129,9 @@ func collectEbay(w http.ResponseWriter, r *http.Request, search_item string, fla
 	}
 	c.Wait()
 	if Err != "" {
-		return errors.New(Err)
+		return nil, errors.New(Err)
 	}
-	return nil
-
+	return &result, nil
 }
 
 type Product struct {
