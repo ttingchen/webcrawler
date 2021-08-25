@@ -18,6 +18,7 @@ import (
 // max product amount for each online store
 const (
 	maxProdNum = 500
+	resultLen  = 2*maxProdNum + 100
 )
 
 func main() {
@@ -41,25 +42,25 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal("collect Ebay fail:", err)
 	}
-	for i := 1; i <= maxProdNum; i++ {
-		json.NewDecoder(r.Body).Decode(&searchResult[i])
-		fmt.Println("Ebay #", i, ": ")
-		fmt.Println(searchResult[i].Name)
-		fmt.Println(searchResult[i].URL)
-		fmt.Println(searchResult[i].Image)
-		fmt.Println(searchResult[i].Price)
+	for i, result := range *searchResult {
+		json.NewDecoder(r.Body).Decode(&result)
+		fmt.Println("Total #", i, ": ")
+		fmt.Println(result.Name)
+		fmt.Println(result.URL)
+		fmt.Println(result.Image)
+		fmt.Println(result.Price)
 		fmt.Println()
 	}
 
 }
 
 // scrape product info from Ebay website
-func collectEbay(ctx context.Context, w http.ResponseWriter, r *http.Request, search_item string) (*[maxProdNum + 100]Product, error) {
+func collectEbay(ctx context.Context, w http.ResponseWriter, r *http.Request, search_item string) (*[]Product, error) {
 
 	prodNum := 1
 	prodPerPage := 25
 	maxPageNum := maxProdNum / prodPerPage
-	var result [maxProdNum + 100]Product
+	var result []Product
 
 	Err := ""
 	c := colly.NewCollector(
@@ -143,7 +144,7 @@ type Product struct {
 }
 
 type webUtil interface {
-	onHTMLFunc(e *colly.HTMLElement, prodNum, maxProdNum int, w http.ResponseWriter, result *[maxProdNum + 100]Product)
+	onHTMLFunc(e *colly.HTMLElement, prodNum *int, w http.ResponseWriter, result *[]Product)
 	getURL(prodName string, pageNum int) string
 	getInfo() webInfo
 }
@@ -158,8 +159,9 @@ type webInfo struct {
 type watsonsUtil webInfo
 type ebayUtil webInfo
 
-func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, prodNum, maxProdNum int, w http.ResponseWriter, result *[maxProdNum + 100]Product) {
-	if prodNum <= maxProdNum {
+func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, prodNum *int, w http.ResponseWriter, result *[]Product) {
+	num := *prodNum
+	if num <= maxProdNum {
 		//avoid to get a null item
 		if e.ChildText("h3[class='s-item__title']") != "" {
 			//use regex to remove the useless part of prodlink
@@ -170,15 +172,16 @@ func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, prodNum, maxProdNum int, w h
 			prodImgLink := e.ChildAttr("img[class='s-item__image-img']", "src")
 			prodPrice := e.ChildText("span[class='s-item__price']")
 
-			fmt.Fprintf(w, "#%v: json.NewEncode:\n", prodNum)
+			fmt.Fprintf(w, "#%v: json.NewEncode:\n", num)
 
-			result[prodNum] = Product{prodName, prodPrice, prodImgLink, prodLinkR}
-			if err := json.NewEncoder(w).Encode(&result[prodNum]); err == nil {
+			*result = append(*result, Product{prodName, prodPrice, prodImgLink, prodLinkR})
+			n := len(*result)
+			if err := json.NewEncoder(w).Encode(&(*result)[n-1]); err == nil {
 				fmt.Fprintf(w, "")
 			}
 			fmt.Fprintf(w, "\n")
 
-			prodNum++
+			*prodNum = num + 1
 		}
 	}
 }
@@ -196,22 +199,24 @@ func (u *ebayUtil) getInfo() webInfo {
 	}
 }
 
-func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, prodNum, maxProdNum int, w http.ResponseWriter, result *[maxProdNum + 100]Product) {
+func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, prodNum *int, w http.ResponseWriter, result *[]Product) {
+	num := *prodNum
 	e.ForEach("e2-product-tile", func(_ int, e *colly.HTMLElement) {
-		prodNum++
-		fmt.Printf("Watsons #%v\n", prodNum)
+		fmt.Printf("Watsons #%v\n", num)
 		prodName := e.ChildText(".productName")
 		prodLink := "https://www.watsons.com.tw" + e.ChildAttr(".ClickSearchResultEvent_Class.gtmAlink", "href")
 		prodImgLink := e.ChildAttr("img", "src")
 		prodPrice := e.ChildText(".productPrice")
-		fmt.Fprintf(w, "#%v: json.NewEncode:\n", prodNum)
+		fmt.Fprintf(w, "#%v: json.NewEncode:\n", num)
 
-		result[prodNum] = Product{prodName, prodPrice, prodImgLink, prodLink}
-		if err := json.NewEncoder(w).Encode(&result[prodNum]); err == nil {
+		*result = append(*result, Product{prodName, prodPrice, prodImgLink, prodLink})
+		n := len(*result)
+		if err := json.NewEncoder(w).Encode(&(*result)[n-1]); err == nil {
 			fmt.Fprintf(w, "")
 		}
 		fmt.Fprintf(w, "\n")
 	})
+	*prodNum = num
 }
 
 func (u *watsonsUtil) getURL(prodName string, pageNum int) string {
@@ -227,13 +232,13 @@ func (u *watsonsUtil) getInfo() webInfo {
 	}
 }
 
-func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *http.Request) (result *[maxProdNum + 100]Product, err error) {
+func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *http.Request) (*[]Product, error) {
 
 	var ebayInfo webUtil = &ebayUtil{
 		Name:       "Ebay",
 		NumPerPage: 25,
 		OnHTML:     "div[class='s-item__wrapper clearfix']",
-		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36"
+		UserAgent:  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36",
 	}
 	var watsonInfo webUtil = &watsonsUtil{
 		Name:       "Watsons",
@@ -247,22 +252,24 @@ func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 		watsonInfo,
 	}
 
+	var result []Product
+
 	for _, website := range websites {
-		result, err = crawlWebsite(ctx, website, prodName, w, r)
+
+		err := crawlWebsite(ctx, website, prodName, &result, w, r)
 		if err != nil {
 			return nil, nil
 		}
 	}
 
-	return result, nil
+	return &result, nil
 }
 
 // scrape product info from website
-func crawlWebsite(ctx context.Context, webutil webUtil, prodName string, w http.ResponseWriter, r *http.Request) (*[maxProdNum + 100]Product, error) {
+func crawlWebsite(ctx context.Context, webutil webUtil, prodName string, result *[]Product, w http.ResponseWriter, r *http.Request) error {
 	Err := ""
 	prodNum := 1
 	webinfo := webutil.getInfo()
-	var result [maxProdNum + 100]Product
 
 	maxPageNum := maxProdNum / webinfo.NumPerPage
 
@@ -272,16 +279,16 @@ func crawlWebsite(ctx context.Context, webutil webUtil, prodName string, w http.
 	)
 	c.Limit(&colly.LimitRule{
 		// Set a delay between requests to these domains
-		Delay: 1 * time.Second,
+		Delay: 3 * time.Second,
 		// Add an additional random delay
-		RandomDelay: 3 * time.Second,
+		RandomDelay: 5 * time.Second,
 
-		Parallelism: 10,
+		Parallelism: 3,
 	})
 
 	c.OnHTML(webinfo.OnHTML, func(e *colly.HTMLElement) {
 		// for each website
-		webutil.onHTMLFunc(e, prodNum, maxProdNum, w, &result)
+		webutil.onHTMLFunc(e, &prodNum, w, result)
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
@@ -310,8 +317,8 @@ func crawlWebsite(ctx context.Context, webutil webUtil, prodName string, w http.
 	}
 	c.Wait()
 	if Err != "" {
-		return nil, errors.New(Err)
+		return errors.New(Err)
 	}
-	return &result, nil
+	return nil
 
 }
