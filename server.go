@@ -138,7 +138,7 @@ func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, prodNum *int, w http.Resp
 }
 
 func (u *watsonsUtil) getURL(prodName string, pageNum int) string {
-	return fmt.Sprintf("https://www.watsons.com.tw/search?text=%v&useDefaultSearch=false&currentPage=%d", prodName, pageNum)
+	return fmt.Sprintf("https://www.watsons.com.tw/search?text=%v&useDefaultSearch=false&pageSize=64&currentPage=%d", prodName, pageNum)
 }
 
 func (u *watsonsUtil) getInfo() webInfo {
@@ -159,7 +159,7 @@ func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 	}
 	var watsonInfo webUtil = &watsonsUtil{
 		Name:       "Watsons",
-		NumPerPage: 32,
+		NumPerPage: 64,
 		OnHTML:     "e2-product-list",
 		UserAgent:  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36",
 	}
@@ -175,7 +175,7 @@ func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 
 		err := crawlWebsite(ctx, website, prodName, &result, w, r)
 		if err != nil {
-			return nil, nil
+			return nil, err
 		}
 	}
 
