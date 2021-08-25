@@ -7,11 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gocolly/colly"
@@ -34,25 +36,34 @@ func main() {
 
 func collyCrawler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	prodname := r.URL.Query().Get("search")
-	if prodname == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	searchResult, err := searchWeb(ctx, url.QueryEscape(prodname), w, r)
-	if err != nil {
-		log.Fatal("collect Ebay fail:", err)
-	}
-	for i, result := range *searchResult {
-		json.NewDecoder(r.Body).Decode(&result)
-		fmt.Println("Total #", i, ": ")
-		fmt.Println(result.Name)
-		fmt.Println(result.URL)
-		fmt.Println(result.Image)
-		fmt.Println(result.Price)
-		fmt.Println()
-	}
 
+	requestBody, _ := ioutil.ReadAll(r.Body)
+	r.ContentLength = int64(len(string(requestBody)))
+	r.TransferEncoding = []string{"identity"}
+
+	r.ParseForm()
+	for k, v := range r.Form {
+		fmt.Println("key:", k)
+		fmt.Println("val:", strings.Join(v, ""))
+		prodname := strings.Join(v, "")
+		if prodname == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		searchResult, err := searchWeb(ctx, url.QueryEscape(prodname), w, r)
+		if err != nil {
+			log.Fatal("collect Ebay fail:", err)
+		}
+		for i, result := range *searchResult {
+			json.NewDecoder(r.Body).Decode(&result)
+			fmt.Println("Total #", i, ": ")
+			fmt.Println(result.Name)
+			fmt.Println(result.URL)
+			fmt.Println(result.Image)
+			fmt.Println(result.Price)
+			fmt.Println()
+		}
+	}
 }
 
 // Product is product
@@ -101,9 +112,8 @@ func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, prodNum *int, w http.Respons
 				fmt.Println(err)
 			} else {
 				io.Copy(w, buf)
-				fmt.Fprintf(w, "")
+				fmt.Fprintf(w, "\n")
 			}
-			fmt.Fprintf(w, "\n")
 
 			*prodNum = num + 1
 		}
@@ -141,9 +151,8 @@ func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, prodNum *int, w http.Resp
 			return
 		} else {
 			io.Copy(w, buf)
-			fmt.Fprintf(w, "")
+			fmt.Fprintf(w, "\n")
 		}
-		fmt.Fprintf(w, "\n")
 		num++
 	})
 	*prodNum = num
@@ -175,7 +184,7 @@ func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 		Name:       "Watsons",
 		NumPerPage: 64,
 		OnHTML:     "e2-product-list",
-		UserAgent:  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36",
+		UserAgent:  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36",
 	}
 
 	websites := []webUtil{
