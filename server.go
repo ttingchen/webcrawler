@@ -37,7 +37,6 @@ func main() {
 
 func collyCrawler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	buf := new(bytes.Buffer)
 	var str string
 
 	// requestBody, _ := ioutil.ReadAll(r.Body)
@@ -59,6 +58,7 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 			log.Fatal("collect Ebay fail:", err)
 		}
 		for i, result := range *searchResult {
+			buf := new(bytes.Buffer)
 			if err = json.NewEncoder(buf).Encode(result); err != nil {
 				fmt.Println(err)
 			} else {
