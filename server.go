@@ -31,6 +31,7 @@ func main() {
 }
 
 func collyCrawler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Enter crawl")
 	ctx := r.Context()
 	prodname := r.URL.Query().Get("search")
 	if prodname == "" {
@@ -44,11 +45,11 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 	for i, result := range *searchResult {
 		json.NewDecoder(r.Body).Decode(&result)
 		fmt.Println("Total #", i, ": ")
-		fmt.Println(result.Name)
-		fmt.Println(result.URL)
-		fmt.Println(result.Image)
-		fmt.Println(result.Price)
-		fmt.Println()
+		// fmt.Println(result.Name)
+		// fmt.Println(result.URL)
+		// fmt.Println(result.Image)
+		// fmt.Println(result.Price)
+		// fmt.Println()
 	}
 
 }
@@ -165,15 +166,18 @@ func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 	}
 
 	websites := []webUtil{
-		ebayInfo,
 		watsonInfo,
+		ebayInfo,
 	}
 
 	var result []Product
 
 	for _, website := range websites {
-
 		err := crawlWebsite(ctx, website, prodName, &result, w, r)
+		if errors.Is(err, context.Canceled) { // 若用戶中離，結束
+			fmt.Println("context cancel error")
+			return nil, err
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -183,17 +187,21 @@ func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 }
 
 // scrape product info from website
-func crawlWebsite(ctx context.Context, webutil webUtil, prodName string, result *[]Product, w http.ResponseWriter, r *http.Request) error {
+func crawlWebsite(rctx context.Context, webutil webUtil, prodName string, result *[]Product, w http.ResponseWriter, r *http.Request) error {
 	Err := ""
 	prodNum := 1
 	webinfo := webutil.getInfo()
 
 	maxPageNum := maxProdNum / webinfo.NumPerPage
-
+	fmt.Println("new collector: ", webinfo.Name)
 	c := colly.NewCollector(
 		colly.Async(true),
 		colly.UserAgent(webinfo.UserAgent),
 	)
+
+	collyctx := colly.NewContext()    // 建立新的 colly.Context
+	collyctx.Put("request_ctx", rctx) // 把 request context 放進 contexy
+
 	c.Limit(&colly.LimitRule{
 		// Set a delay between requests to these domains
 		Delay: 3 * time.Second,
@@ -213,9 +221,18 @@ func crawlWebsite(ctx context.Context, webutil webUtil, prodName string, result 
 	})
 
 	c.OnRequest(func(r *colly.Request) {
+		v := r.Ctx.GetAny("request_ctx")
+		ctx, ok := v.(context.Context)
+		if !ok {
+			fmt.Println("context type error")
+			r.Abort()
+			return
+		}
 		select {
 		case <-ctx.Done(): // 如果 canceled
+			fmt.Println("context done")
 			r.Abort() // 結束 request
+			Err = fmt.Sprintln("context done")
 		default: // 要有 default，不然 select {} 會卡住
 		}
 	})
@@ -224,7 +241,7 @@ func crawlWebsite(ctx context.Context, webutil webUtil, prodName string, result 
 	for pageNum := 1; pageNum <= maxPageNum; pageNum++ {
 		visitURL := webutil.getURL(prodName, pageNum)
 		if prodNum <= maxProdNum {
-			if err := c.Visit(visitURL); err != nil {
+			if err := c.Request(http.MethodGet, visitURL, nil, collyctx, nil); err != nil {
 				log.Println("Url err:", err)
 			}
 		} else {
