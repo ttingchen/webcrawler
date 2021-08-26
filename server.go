@@ -26,7 +26,7 @@ const (
 
 func main() {
 	//usage: http://localhost:9090/?search=keyword
-	http.HandleFunc("/", collyCrawler)
+	http.HandleFunc("/search", collyCrawler)
 	//set port number
 	err := http.ListenAndServe(":9090", nil)
 	if err != nil {
@@ -36,10 +36,12 @@ func main() {
 
 func collyCrawler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	buf := new(bytes.Buffer)
+	var str string
 
-	requestBody, _ := ioutil.ReadAll(r.Body)
-	r.ContentLength = int64(len(string(requestBody)))
-	r.TransferEncoding = []string{"identity"}
+	// requestBody, _ := ioutil.ReadAll(r.Body)
+	// r.ContentLength = int64(len(string(requestBody)))
+	// r.TransferEncoding = []string{"identity"}
 
 	r.ParseForm()
 	for k, v := range r.Form {
@@ -50,28 +52,33 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		w.WriteHeader(http.StatusOK)
 		searchResult, err := searchWeb(ctx, url.QueryEscape(prodname), w, r)
 		if err != nil {
 			log.Fatal("collect Ebay fail:", err)
 		}
 		for i, result := range *searchResult {
-			json.NewDecoder(r.Body).Decode(&result)
-			fmt.Println("Total #", i, ": ")
-			fmt.Println(result.Name)
-			fmt.Println(result.URL)
-			fmt.Println(result.Image)
-			fmt.Println(result.Price)
-			fmt.Println()
+			if err = json.NewEncoder(buf).Encode(result); err != nil {
+				fmt.Println(err)
+			} else {
+				str = string(buf.Bytes())
+			}
+			var product Product
+			if err := json.NewDecoder(strings.NewReader(str)).Decode(&product); err == nil {
+				fmt.Printf("Total #%d : \n%v\n%v\n%v\n%v\n\n", i, product.Name, product.URL, product.Image, product.Price)
+			} else {
+				fmt.Println(err)
+			}
 		}
 	}
 }
 
 // Product is product
 type Product struct {
-	Name  string `json:"name"`
-	Price string `json:"price"`
-	Image string `json:"image_link"`
-	URL   string `json:"url"`
+	Name  string `json:"Name"`
+	Price string `json:"Price"`
+	Image string `json:"Image"`
+	URL   string `json:"URL"`
 }
 
 type webUtil interface {
@@ -180,16 +187,16 @@ func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 		OnHTML:     "div[class='s-item__wrapper clearfix']",
 		UserAgent:  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36",
 	}
-	var watsonInfo webUtil = &watsonsUtil{
-		Name:       "Watsons",
-		NumPerPage: 64,
-		OnHTML:     "e2-product-list",
-		UserAgent:  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36",
-	}
+	// var watsonInfo webUtil = &watsonsUtil{
+	// 	Name:       "Watsons",
+	// 	NumPerPage: 64,
+	// 	OnHTML:     "e2-product-list",
+	// 	UserAgent:  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36",
+	// }
 
 	websites := []webUtil{
 		ebayInfo,
-		watsonInfo,
+		// watsonInfo,
 	}
 
 	var result []Product
@@ -210,6 +217,11 @@ func crawlWebsite(ctx context.Context, webutil webUtil, prodName string, result 
 	Err := ""
 	prodNum := 1
 	webinfo := webutil.getInfo()
+
+	// remove the header of TransferEncoding
+	requestBody, _ := ioutil.ReadAll(r.Body)
+	r.ContentLength = int64(len(string(requestBody)))
+	r.TransferEncoding = []string{"identity"}
 
 	maxPageNum := maxProdNum / webinfo.NumPerPage
 
