@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gocolly/colly"
@@ -37,7 +38,6 @@ func main() {
 func collyCrawler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Enter crawl")
 	ctx := r.Context()
-	buf := new(bytes.Buffer)
 	var str string
 
 	// requestBody, _ := ioutil.ReadAll(r.Body)
@@ -58,7 +58,9 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Fatal("collect Ebay fail:", err)
 		}
+
 		for i, result := range *searchResult {
+			buf := new(bytes.Buffer)
 			if err = json.NewEncoder(buf).Encode(result); err != nil {
 				fmt.Println(err)
 			} else {
@@ -66,7 +68,7 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 			}
 			var product Product
 			if err := json.NewDecoder(strings.NewReader(str)).Decode(&product); err == nil {
-				fmt.Printf("Total #%d : \n%v\n%v\n%v\n%v\n\n", i, product.Name, product.URL, product.Image, product.Price)
+				fmt.Printf("Total #%d : \n%v\n%v\n%v\n%v\n\n", i+1, product.Name, product.URL, product.Image, product.Price)
 			} else {
 				fmt.Println(err)
 			}
@@ -83,7 +85,7 @@ type Product struct {
 }
 
 type webUtil interface {
-	onHTMLFunc(e *colly.HTMLElement, prodNum *int, w http.ResponseWriter, result *[]Product) error
+	onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, result *[]Product) error
 	getURL(prodName string, pageNum int) string
 	getInfo() webInfo
 }
@@ -98,10 +100,9 @@ type webInfo struct {
 type watsonsUtil webInfo
 type ebayUtil webInfo
 
-func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, prodNum *int, w http.ResponseWriter, result *[]Product) (err error) {
-	num := *prodNum
+func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, result *[]Product) (err error) {
 	buf := new(bytes.Buffer)
-	if num <= maxProdNum {
+	if len(*result) <= maxProdNum {
 		//avoid to get a null item
 		if e.ChildText("h3[class='s-item__title']") != "" {
 			//use regex to remove the useless part of prodlink
@@ -112,18 +113,19 @@ func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, prodNum *int, w http.Respons
 			prodImgLink := e.ChildAttr("img[class='s-item__image-img']", "src")
 			prodPrice := e.ChildText("span[class='s-item__price']")
 
-			fmt.Fprintf(w, "Ebay #%v: json.NewEncode:\n", num)
+			prod := Product{prodName, prodPrice, prodImgLink, prodLinkR}
 
-			*result = append(*result, Product{prodName, prodPrice, prodImgLink, prodLinkR})
+			*result = append(*result, prod)
 			n := len(*result)
-			if err = json.NewEncoder(buf).Encode((*result)[n-1]); err != nil {
+			if err = json.NewEncoder(buf).Encode(prod); err != nil {
 				fmt.Println(err)
-			} else {
-				io.Copy(w, buf)
-				fmt.Fprintf(w, "\n")
+				return
 			}
-
-			*prodNum = num + 1
+			m.Lock()
+			fmt.Fprintf(w, "Ebay #%v: json.NewEncode:\n", n)
+			io.Copy(w, buf)
+			fmt.Fprintf(w, "\n")
+			m.Unlock()
 		}
 	}
 	return err
@@ -142,29 +144,29 @@ func (u *ebayUtil) getInfo() webInfo {
 	}
 }
 
-func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, prodNum *int, w http.ResponseWriter, result *[]Product) (err error) {
-	num := *prodNum
-	//fmt.Println(e.ChildText("h3[class='ng-star-inserted']"))
+func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, result *[]Product) (err error) {
+
 	buf := new(bytes.Buffer)
 	e.ForEach("e2-product-tile", func(_ int, e *colly.HTMLElement) {
 		prodName := e.ChildText(".productName")
 		prodLink := "https://www.watsons.com.tw" + e.ChildAttr(".ClickSearchResultEvent_Class.gtmAlink", "href")
 		prodImgLink := e.ChildAttr("img", "src")
 		prodPrice := e.ChildText(".productPrice")
-		fmt.Fprintf(w, "Watsons #%v: json.NewEncode:\n", num)
+		prod := Product{prodName, prodPrice, prodImgLink, prodLink}
 
-		*result = append(*result, Product{prodName, prodPrice, prodImgLink, prodLink})
+		*result = append(*result, prod)
 		n := len(*result)
-		if err = json.NewEncoder(buf).Encode((*result)[n-1]); err != nil {
+		if err = json.NewEncoder(buf).Encode(prod); err != nil {
 			fmt.Println(err)
 			return
 		}
+		m.Lock()
+		fmt.Fprintf(w, "Watsons #%v: json.NewEncode:\n", n)
 		io.Copy(w, buf)
 		fmt.Fprintf(w, "\n")
+		m.Unlock()
 
-		num++
 	})
-	*prodNum = num
 
 	return err
 }
@@ -202,9 +204,10 @@ func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 	}
 
 	var result []Product
+	var mu sync.Mutex
 
 	for _, website := range websites {
-		err := crawlWebsite(ctx, website, prodName, &result, w, r)
+		err := crawlWebsite(ctx, &mu, website, prodName, &result, w, r)
 		if errors.Is(err, context.Canceled) { // 若用戶中離，結束
 			fmt.Println("context cancel error")
 			return nil, err
@@ -218,7 +221,7 @@ func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 }
 
 // scrape product info from website
-func crawlWebsite(rctx context.Context, webutil webUtil, prodName string, result *[]Product, w http.ResponseWriter, r *http.Request) error {
+func crawlWebsite(rctx context.Context, mu *sync.Mutex, webutil webUtil, prodName string, result *[]Product, w http.ResponseWriter, r *http.Request) error {
 	Err := ""
 	prodNum := 1
 	webinfo := webutil.getInfo()
@@ -249,7 +252,7 @@ func crawlWebsite(rctx context.Context, webutil webUtil, prodName string, result
 
 	c.OnHTML(webinfo.OnHTML, func(e *colly.HTMLElement) {
 		// for each website
-		webutil.onHTMLFunc(e, &prodNum, w, result)
+		webutil.onHTMLFunc(e, mu, w, result)
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
