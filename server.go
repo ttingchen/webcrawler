@@ -145,7 +145,6 @@ func (u *ebayUtil) getInfo() webInfo {
 }
 
 func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, result *[]Product) (err error) {
-
 	buf := new(bytes.Buffer)
 	e.ForEach("e2-product-tile", func(_ int, e *colly.HTMLElement) {
 		prodName := e.ChildText(".productName")
@@ -225,6 +224,7 @@ func crawlWebsite(rctx context.Context, mu *sync.Mutex, webutil webUtil, prodNam
 	Err := ""
 	prodNum := 1
 	webinfo := webutil.getInfo()
+	wg := sync.WaitGroup{}
 
 	// remove the header of TransferEncoding
 	requestBody, _ := ioutil.ReadAll(r.Body)
@@ -276,10 +276,16 @@ func crawlWebsite(rctx context.Context, mu *sync.Mutex, webutil webUtil, prodNam
 		}
 	})
 
+	c.OnScraped(func(r *colly.Response) {
+		fmt.Println("On Scraped, wait group done")
+		wg.Done()
+	})
+
 	//load 1 to pageNum pages
 	for pageNum := 1; pageNum <= maxPageNum; pageNum++ {
 		visitURL := webutil.getURL(prodName, pageNum)
 		if prodNum <= maxProdNum {
+			wg.Add(1)
 			if err := c.Request(http.MethodGet, visitURL, nil, collyctx, nil); err != nil {
 				log.Println("Url err:", err)
 			}
@@ -288,7 +294,9 @@ func crawlWebsite(rctx context.Context, mu *sync.Mutex, webutil webUtil, prodNam
 			break
 		}
 	}
-	c.Wait()
+	wg.Wait()
+	fmt.Println("Done waiting")
+
 	if Err != "" {
 		return errors.New(Err)
 	}
