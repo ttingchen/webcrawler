@@ -229,6 +229,8 @@ func crawlWebsite(rctx context.Context, mu *sync.Mutex, webutil webUtil, prodNam
 
 	collyctx := colly.NewContext()    // 建立新的 colly.Context
 	collyctx.Put("request_ctx", rctx) // 把 request context 放進 contexy
+	ch := make(chan []Product, 1000)  // 同理，建立一個 []Product channel
+	collyctx.Put("response_ch", ch)
 
 	c.Limit(&colly.LimitRule{
 		// Set a delay between requests to these domains
@@ -241,11 +243,26 @@ func crawlWebsite(rctx context.Context, mu *sync.Mutex, webutil webUtil, prodNam
 
 	c.OnHTML(webinfo.OnHTML, func(e *colly.HTMLElement) {
 		// for each website
+		v := e.Request.Ctx.GetAny("response_ch")
+		ch, ok := v.(chan []Product)
+		if !ok {
+			fmt.Println("onHTML ch failed!")
+			return
+		}
+		// for each website
 		webutil.onHTMLFunc(e, mu, w, result)
+		fmt.Println("send result to ch!")
+		ch <- *result
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
+		v := r.Ctx.GetAny("response_ch") // v 的型別是 interface{}
+		_, ok := v.(chan []Product)      // 所以要 type assertion
+		if !ok {                         // 若型別不對，記得要處理錯誤
+			return
+		}
 		Err = fmt.Sprintln("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
+		wg.Done()
 	})
 
 	c.OnRequest(func(r *colly.Request) {
@@ -256,9 +273,19 @@ func crawlWebsite(rctx context.Context, mu *sync.Mutex, webutil webUtil, prodNam
 			r.Abort()
 			return
 		}
+
+		v = r.Ctx.GetAny("response_ch") // v 的型別是 interface{}
+		_, ok = v.(chan []Product)      // 所以要 type assertion
+		if !ok {
+			wg.Done() // 若型別不對，記得要處理錯誤
+			r.Abort()
+			return
+		}
+
 		select {
 		case <-ctx.Done(): // 如果 canceled
 			fmt.Println("context done")
+			wg.Done()
 			r.Abort() // 結束 request
 			Err = fmt.Sprintln("context done")
 		default: // 要有 default，不然 select {} 會卡住
@@ -266,7 +293,8 @@ func crawlWebsite(rctx context.Context, mu *sync.Mutex, webutil webUtil, prodNam
 	})
 
 	c.OnScraped(func(r *colly.Response) {
-		fmt.Println("On Scraped, wait group done")
+		fmt.Println("onScraped!")
+		fmt.Println("wg.Done()")
 		wg.Done()
 	})
 
@@ -280,7 +308,8 @@ func crawlWebsite(rctx context.Context, mu *sync.Mutex, webutil webUtil, prodNam
 	}
 
 	wg.Wait()
-	fmt.Println("Done waiting")
+	fmt.Println("wg done, close channel")
+	close(ch)
 
 	if Err != "" {
 		return errors.New(Err)
