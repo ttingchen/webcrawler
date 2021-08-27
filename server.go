@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -39,10 +38,6 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Enter crawl")
 	ctx := r.Context()
 	var str string
-
-	// requestBody, _ := ioutil.ReadAll(r.Body)
-	// r.ContentLength = int64(len(string(requestBody)))
-	// r.TransferEncoding = []string{"identity"}
 
 	r.ParseForm()
 	for k, v := range r.Form {
@@ -132,7 +127,7 @@ func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.Respon
 }
 
 func (u *ebayUtil) getURL(prodName string, pageNum int) string {
-	return "https://www.ebay.com/sch/i.html?_nkw=" + prodName + "&_ipg=25&_pgn=" + strconv.Itoa(pageNum)
+	return "https://www.ebay.com/sch/i.html?_nkw=" + prodName + "&_ipg=50&_pgn=" + strconv.Itoa(pageNum)
 }
 
 func (u *ebayUtil) getInfo() webInfo {
@@ -186,7 +181,7 @@ func (u *watsonsUtil) getInfo() webInfo {
 func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *http.Request) (*[]Product, error) {
 	var ebayInfo webUtil = &ebayUtil{
 		Name:       "Ebay",
-		NumPerPage: 25,
+		NumPerPage: 50,
 		OnHTML:     "div[class='s-item__wrapper clearfix']",
 		UserAgent:  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36",
 	}
@@ -222,14 +217,8 @@ func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 // scrape product info from website
 func crawlWebsite(rctx context.Context, mu *sync.Mutex, webutil webUtil, prodName string, result *[]Product, w http.ResponseWriter, r *http.Request) error {
 	Err := ""
-	prodNum := 1
 	webinfo := webutil.getInfo()
 	wg := sync.WaitGroup{}
-
-	// remove the header of TransferEncoding
-	requestBody, _ := ioutil.ReadAll(r.Body)
-	r.ContentLength = int64(len(string(requestBody)))
-	r.TransferEncoding = []string{"identity"}
 
 	maxPageNum := maxProdNum / webinfo.NumPerPage
 	fmt.Println("new collector: ", webinfo.Name)
@@ -284,16 +273,12 @@ func crawlWebsite(rctx context.Context, mu *sync.Mutex, webutil webUtil, prodNam
 	//load 1 to pageNum pages
 	for pageNum := 1; pageNum <= maxPageNum; pageNum++ {
 		visitURL := webutil.getURL(prodName, pageNum)
-		if prodNum <= maxProdNum {
-			wg.Add(1)
-			if err := c.Request(http.MethodGet, visitURL, nil, collyctx, nil); err != nil {
-				log.Println("Url err:", err)
-			}
-		} else {
-			//if we have enough product info, don't load next page
-			break
+		wg.Add(1)
+		if err := c.Request(http.MethodGet, visitURL, nil, collyctx, nil); err != nil {
+			log.Println("Url err:", err)
 		}
 	}
+
 	wg.Wait()
 	fmt.Println("Done waiting")
 
