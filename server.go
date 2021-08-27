@@ -100,17 +100,16 @@ func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.Respon
 			prodImgLink := e.ChildAttr("img[class='s-item__image-img']", "src")
 			prodPrice := e.ChildText("span[class='s-item__price']")
 
+			m.Lock()
 			prod := Product{prodName, prodPrice, prodImgLink, prodLinkR}
 			buf := new(bytes.Buffer)
 			*result = append(*result, prod)
 			if err = json.NewEncoder(buf).Encode(prod); err != nil {
 				fmt.Println(err)
 				return
-			} else {
-				str := string(buf.Bytes())
-				*resultJSON = append(*resultJSON, str)
 			}
-			m.Lock()
+			str := string(buf.Bytes())
+			*resultJSON = append(*resultJSON, str)
 			fmt.Fprintf(w, "Ebay #%v: json.NewEncode:\n", len(*result))
 			io.Copy(w, buf)
 			fmt.Fprintf(w, "\n")
@@ -141,6 +140,7 @@ func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.Res
 		prodImgLink := e.ChildAttr("img", "src")
 		prodPrice := e.ChildText(".productPrice")
 
+		m.Lock()
 		prod := Product{prodName, prodPrice, prodImgLink, prodLink}
 		buf := new(bytes.Buffer)
 		*result = append(*result, prod)
@@ -148,11 +148,9 @@ func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.Res
 		if err = json.NewEncoder(buf).Encode(prod); err != nil {
 			fmt.Println(err)
 			return
-		} else {
-			str := string(buf.Bytes())
-			*resultJSON = append(*resultJSON, str)
 		}
-		m.Lock()
+		str := string(buf.Bytes())
+		*resultJSON = append(*resultJSON, str)
 		fmt.Fprintf(w, "Watsons #%v: json.NewEncode:\n", n)
 		io.Copy(w, buf)
 		fmt.Fprintf(w, "\n")
