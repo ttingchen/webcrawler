@@ -21,11 +21,11 @@ import (
 
 // max product amount for each online store
 const (
-	maxProdNum = 300
+	maxProdNum = 2000
 )
 
 func main() {
-	//usage: http://localhost:9090/search?keyword=apple
+	//usage: http://localhost:9090/search?keyword=100
 	http.HandleFunc("/search", collyCrawler)
 	//set port number
 	err := http.ListenAndServe(":9090", nil)
@@ -49,12 +49,13 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
+
 		searchResult, err := searchWeb(ctx, url.QueryEscape(prodname), w, r)
 		if err != nil {
-			log.Fatal("collect Ebay fail:", err)
+			log.Fatal("collect failed:", err)
 		}
 
-		for i, result := range *searchResult {
+		for _, result := range *searchResult {
 			buf := new(bytes.Buffer)
 			if err = json.NewEncoder(buf).Encode(result); err != nil {
 				fmt.Println(err)
@@ -63,7 +64,7 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 			}
 			var product Product
 			if err := json.NewDecoder(strings.NewReader(str)).Decode(&product); err == nil {
-				fmt.Printf("Total #%d : \n%v\n%v\n%v\n%v\n\n", i+1, product.Name, product.URL, product.Image, product.Price)
+				//fmt.Printf("Total #%d : \n%v\n%v\n%v\n%v\n\n", i+1, product.Name, product.URL, product.Image, product.Price)
 			} else {
 				fmt.Println(err)
 			}
@@ -199,28 +200,38 @@ func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 
 	var result []Product
 	var mu sync.Mutex
-	waitCrawl := sync.WaitGroup{}
+	c := make(chan error, 2)
+	counter := 0
 
 	for _, website := range websites {
-		waitCrawl.Add(1)
+
 		go func(web webUtil) {
-			crawlWebsite(ctx, &waitCrawl, &mu, web, prodName, &result, w, r)
+			crawlWebsite(ctx, c, &mu, web, prodName, &result, w, r)
 		}(website)
 	}
 
-	waitCrawl.Wait()
+	for err := range c {
+		counter++
+		if err != nil {
+			fmt.Println("err:", err)
+			return nil, err
+		}
+		if counter == 2 {
+			break
+		}
+	}
+	fmt.Println("done err waiting")
 	return &result, nil
 }
 
 // scrape product info from website
-func crawlWebsite(rctx context.Context, waitcrawl *sync.WaitGroup, mu *sync.Mutex, webutil webUtil, prodName string, result *[]Product, w http.ResponseWriter, r *http.Request) error {
-	defer waitcrawl.Done()
+func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webutil webUtil, prodName string, result *[]Product, w http.ResponseWriter, r *http.Request) {
 	Err := ""
 	webinfo := webutil.getInfo()
 	wg := sync.WaitGroup{}
 
 	maxPageNum := (maxProdNum / 2) / webinfo.NumPerPage
-	fmt.Println("new collector: ", webinfo.Name)
+	fmt.Println("new collector:", webinfo.Name)
 	c := colly.NewCollector(
 		colly.Async(true),
 		colly.UserAgent(webinfo.UserAgent),
@@ -260,6 +271,7 @@ func crawlWebsite(rctx context.Context, waitcrawl *sync.WaitGroup, mu *sync.Mute
 			fmt.Println("context done")
 			r.Abort() // 結束 request
 			Err = fmt.Sprintln("context done")
+			wg.Done()
 		default: // 要有 default，不然 select {} 會卡住
 		}
 	})
@@ -272,9 +284,10 @@ func crawlWebsite(rctx context.Context, waitcrawl *sync.WaitGroup, mu *sync.Mute
 	//load 1 to pageNum pages
 	for pageNum := 1; pageNum <= maxPageNum; pageNum++ {
 		visitURL := webutil.getURL(prodName, pageNum)
+		time.Sleep(300 * time.Millisecond) //to observe context done
 		wg.Add(1)
 		if err := c.Request(http.MethodGet, visitURL, nil, collyctx, nil); err != nil {
-			log.Println("Url err:", err)
+			log.Println("Url err: ", err)
 		}
 	}
 
@@ -282,8 +295,10 @@ func crawlWebsite(rctx context.Context, waitcrawl *sync.WaitGroup, mu *sync.Mute
 	fmt.Println("Done waiting")
 
 	if Err != "" {
-		return errors.New(Err)
+		errchan <- errors.New(Err)
+		close(errchan)
+		return
 	}
-	return nil
-
+	errchan <- nil
+	return
 }
