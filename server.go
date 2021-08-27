@@ -21,7 +21,7 @@ import (
 
 // max product amount for each online store
 const (
-	maxProdNum = 500
+	maxProdNum = 300
 )
 
 func main() {
@@ -97,7 +97,7 @@ type ebayUtil webInfo
 
 func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, result *[]Product) (err error) {
 	buf := new(bytes.Buffer)
-	if len(*result) <= maxProdNum {
+	if len(*result) < maxProdNum {
 		//avoid to get a null item
 		if e.ChildText("h3[class='s-item__title']") != "" {
 			//use regex to remove the useless part of prodlink
@@ -111,13 +111,12 @@ func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.Respon
 			prod := Product{prodName, prodPrice, prodImgLink, prodLinkR}
 
 			*result = append(*result, prod)
-			n := len(*result)
 			if err = json.NewEncoder(buf).Encode(prod); err != nil {
 				fmt.Println(err)
 				return
 			}
 			m.Lock()
-			fmt.Fprintf(w, "Ebay #%v: json.NewEncode:\n", n)
+			fmt.Fprintf(w, "Ebay #%v: json.NewEncode:\n", len(*result))
 			io.Copy(w, buf)
 			fmt.Fprintf(w, "\n")
 			m.Unlock()
@@ -142,6 +141,7 @@ func (u *ebayUtil) getInfo() webInfo {
 func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, result *[]Product) (err error) {
 	buf := new(bytes.Buffer)
 	e.ForEach("e2-product-tile", func(_ int, e *colly.HTMLElement) {
+		time.Sleep(100 * time.Millisecond) // to observe the goroutine
 		prodName := e.ChildText(".productName")
 		prodLink := "https://www.watsons.com.tw" + e.ChildAttr(".ClickSearchResultEvent_Class.gtmAlink", "href")
 		prodImgLink := e.ChildAttr("img", "src")
@@ -199,28 +199,27 @@ func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 
 	var result []Product
 	var mu sync.Mutex
+	waitCrawl := sync.WaitGroup{}
 
 	for _, website := range websites {
-		err := crawlWebsite(ctx, &mu, website, prodName, &result, w, r)
-		if errors.Is(err, context.Canceled) { // 若用戶中離，結束
-			fmt.Println("context cancel error")
-			return nil, err
-		}
-		if err != nil {
-			return nil, err
-		}
+		waitCrawl.Add(1)
+		go func(web webUtil) {
+			crawlWebsite(ctx, &waitCrawl, &mu, web, prodName, &result, w, r)
+		}(website)
 	}
 
+	waitCrawl.Wait()
 	return &result, nil
 }
 
 // scrape product info from website
-func crawlWebsite(rctx context.Context, mu *sync.Mutex, webutil webUtil, prodName string, result *[]Product, w http.ResponseWriter, r *http.Request) error {
+func crawlWebsite(rctx context.Context, waitcrawl *sync.WaitGroup, mu *sync.Mutex, webutil webUtil, prodName string, result *[]Product, w http.ResponseWriter, r *http.Request) error {
+	defer waitcrawl.Done()
 	Err := ""
 	webinfo := webutil.getInfo()
 	wg := sync.WaitGroup{}
 
-	maxPageNum := maxProdNum / webinfo.NumPerPage
+	maxPageNum := (maxProdNum / 2) / webinfo.NumPerPage
 	fmt.Println("new collector: ", webinfo.Name)
 	c := colly.NewCollector(
 		colly.Async(true),
@@ -228,7 +227,7 @@ func crawlWebsite(rctx context.Context, mu *sync.Mutex, webutil webUtil, prodNam
 	)
 
 	collyctx := colly.NewContext()    // 建立新的 colly.Context
-	collyctx.Put("request_ctx", rctx) // 把 request context 放進 contexy
+	collyctx.Put("request_ctx", rctx) // 把 request context 放進 colly
 
 	c.Limit(&colly.LimitRule{
 		// Set a delay between requests to these domains
