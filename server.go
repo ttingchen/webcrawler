@@ -197,12 +197,20 @@ func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 	var resultJSON []string
 	var mu sync.Mutex
 	waitCrawl := sync.WaitGroup{}
+	errs := make(chan error, 2)
+	defer close(errs)
+	waitCrawl.Add(len(websites))
 
 	for _, website := range websites {
-		waitCrawl.Add(1)
 		go func(web webUtil) {
-			crawlWebsite(ctx, &waitCrawl, &mu, web, prodName, &result, &resultJSON, w, r)
+			errs <- crawlWebsite(ctx, &waitCrawl, &mu, web, prodName, &result, &resultJSON, w, r)
 		}(website)
+	}
+	if err := <-errs; err != nil {
+		if errors.Is(err, context.Canceled) { // 若用戶中離，結束
+			fmt.Println("context cancel error")
+		}
+		return nil, err
 	}
 
 	waitCrawl.Wait()
@@ -245,24 +253,22 @@ func crawlWebsite(rctx context.Context, waitcrawl *sync.WaitGroup, mu *sync.Mute
 	})
 
 	c.OnRequest(func(r *colly.Request) {
+	})
+
+	c.OnScraped(func(r *colly.Response) {
 		v := r.Ctx.GetAny("request_ctx")
 		ctx, ok := v.(context.Context)
 		if !ok {
 			fmt.Println("context type error")
-			r.Abort()
 			return
 		}
 		select {
 		case <-ctx.Done(): // 如果 canceled
 			fmt.Println("context done")
-			r.Abort() // 結束 request
 			Err = fmt.Sprintln("context done")
-			wg.Done()
 		default: // 要有 default，不然 select {} 會卡住
 		}
-	})
 
-	c.OnScraped(func(r *colly.Response) {
 		fmt.Println("On Scraped, wait group done")
 		wg.Done()
 	})
