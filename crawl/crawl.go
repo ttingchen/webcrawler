@@ -57,7 +57,7 @@ func SearchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 
 	for _, website := range websites {
 		go func(web webUtil) {
-			crawlWebsite(ctx, c, &mu, web, prodName, &resultJSON, w, r)
+			crawlWebsite(ctx, c, &mu, web, prodName, &resultJSON, w)
 		}(website)
 	}
 
@@ -95,7 +95,7 @@ func LogResults(ctx context.Context, searchResult *[]string) error {
 	return nil
 }
 
-func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webutil webUtil, prodName string, resultJSON *[]string, w http.ResponseWriter, r *http.Request) {
+func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webutil webUtil, prodName string, resultJSON *[]string, w http.ResponseWriter) {
 	Err := ""
 	webinfo := webutil.getInfo()
 	wg := sync.WaitGroup{}
