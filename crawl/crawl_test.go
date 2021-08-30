@@ -1,7 +1,6 @@
 package crawl
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -26,11 +25,9 @@ func TestSearchWeb(t *testing.T) {
 			prodName: "cup",
 		},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	// Create a request to pass to our handler. We don't have any query parameters for now, so we'll
 	// pass 'nil' as the third parameter.
-	req, err := http.NewRequest("GET", "", nil)
+	req, err := http.NewRequest("GET", "/search-check", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,14 +36,15 @@ func TestSearchWeb(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		t.Run(tt.name, func(t *testing.T) {
-
 			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				ctx := r.Context()
 				searchResult, err := SearchWeb(ctx, url.QueryEscape(tt.prodName), w, r)
 				if err != nil || len(*searchResult) == 0 {
 					t.Fatalf("Search failed with err %s and search length %d", err, len(*searchResult))
 				}
-				return
+				t.Log("Length of search results:", len(*searchResult))
 			})
+
 			// Our handlers satisfy http.Handler, so we can call their ServeHTTP method
 			// directly and pass in our Request and ResponseRecorder.
 			handler.ServeHTTP(rr, req)
