@@ -1,20 +1,22 @@
 package crawl
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
-	"regexp"
-	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/gocolly/colly"
+)
+
+// total max product amount
+const (
+	maxProdNum = 500
 )
 
 // Product is product
@@ -25,27 +27,10 @@ type Product struct {
 	URL   string `json:"URL"`
 }
 
-type webUtil interface {
-	onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, resultJSON *[]string) error
-	getURL(prodName string, pageNum int) string
-	getInfo() webInfo
-}
-
-type webInfo struct {
-	Name       string
-	NumPerPage int
-	OnHTML     string
-	UserAgent  string
-}
-
 type watsonsUtil webInfo
 type ebayUtil webInfo
 
-// total max product amount
-const (
-	maxProdNum = 500
-)
-
+// SearchWeb uses a colly collector to crawl for each website.
 func SearchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *http.Request) (*[]string, error) {
 	var ebayInfo webUtil = &ebayUtil{
 		Name:       "Ebay",
@@ -71,7 +56,6 @@ func SearchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 	counter := 0
 
 	for _, website := range websites {
-
 		go func(web webUtil) {
 			crawlWebsite(ctx, c, &mu, web, prodName, &resultJSON, w, r)
 		}(website)
@@ -91,7 +75,26 @@ func SearchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 	return &resultJSON, nil
 }
 
-// scrape product info from website
+// LogResults logs the scraped results.
+func LogResults(ctx context.Context, searchResult *[]string) error {
+	fmt.Println("Start to log results")
+	for i, result := range *searchResult {
+		select {
+		case <-ctx.Done():
+			return context.Canceled
+		default:
+		}
+
+		var product Product
+		if err := json.NewDecoder(strings.NewReader(result)).Decode(&product); err == nil {
+			fmt.Printf("Total #%d : \n%v\n%v\n%v\n%v\n\n", i+1, product.Name, product.URL, product.Image, product.Price)
+		} else {
+			return err
+		}
+	}
+	return nil
+}
+
 func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webutil webUtil, prodName string, resultJSON *[]string, w http.ResponseWriter, r *http.Request) {
 	Err := ""
 	webinfo := webutil.getInfo()
@@ -165,87 +168,4 @@ func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webu
 	}
 	errchan <- nil
 	return
-}
-
-func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, resultJSON *[]string) (err error) {
-	if len(*resultJSON) < maxProdNum {
-		//avoid to get a null item
-		if e.ChildText("h3[class='s-item__title']") != "" {
-			//use regex to remove the useless part of prodlink
-			re := regexp.MustCompile(`\?(.*)`)
-			prodName := e.ChildText("h3[class='s-item__title']")
-			prodLink := e.ChildAttr("a[class='s-item__link']", "href")
-			prodLinkR := re.ReplaceAllString(prodLink, "")
-			prodImgLink := e.ChildAttr("img[class='s-item__image-img']", "src")
-			prodPrice := e.ChildText("span[class='s-item__price']")
-
-			m.Lock()
-			prod := Product{prodName, prodPrice, prodImgLink, prodLinkR}
-			buf := new(bytes.Buffer)
-			if err = json.NewEncoder(buf).Encode(prod); err != nil {
-				fmt.Println(err)
-				return
-			}
-			str := string(buf.Bytes())
-			*resultJSON = append(*resultJSON, str)
-			fmt.Fprintf(w, "Ebay #%v: json.NewEncode:\n", len(*resultJSON))
-			io.Copy(w, buf)
-			fmt.Fprintf(w, "\n")
-			m.Unlock()
-		}
-	}
-	return err
-}
-
-func (u *ebayUtil) getURL(prodName string, pageNum int) string {
-	return "https://www.ebay.com/sch/i.html?_nkw=" + prodName + "&_ipg=50&_pgn=" + strconv.Itoa(pageNum)
-}
-
-func (u *ebayUtil) getInfo() webInfo {
-	return webInfo{
-		Name:       u.Name,
-		NumPerPage: u.NumPerPage,
-		OnHTML:     u.OnHTML,
-		UserAgent:  u.UserAgent,
-	}
-}
-
-func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, resultJSON *[]string) (err error) {
-	e.ForEach("e2-product-tile", func(_ int, e *colly.HTMLElement) {
-		time.Sleep(100 * time.Millisecond) // to observe the goroutine
-		prodName := e.ChildText(".productName")
-		prodLink := "https://www.watsons.com.tw" + e.ChildAttr(".ClickSearchResultEvent_Class.gtmAlink", "href")
-		prodImgLink := e.ChildAttr("img", "src")
-		prodPrice := e.ChildText(".productPrice")
-
-		m.Lock()
-		prod := Product{prodName, prodPrice, prodImgLink, prodLink}
-		buf := new(bytes.Buffer)
-		if err = json.NewEncoder(buf).Encode(prod); err != nil {
-			fmt.Println(err)
-			return
-		}
-		str := string(buf.Bytes())
-		*resultJSON = append(*resultJSON, str)
-		fmt.Fprintf(w, "Watsons #%v: json.NewEncode:\n", len(*resultJSON))
-		io.Copy(w, buf)
-		fmt.Fprintf(w, "\n")
-		m.Unlock()
-
-	})
-
-	return err
-}
-
-func (u *watsonsUtil) getURL(prodName string, pageNum int) string {
-	return fmt.Sprintf("https://www.watsons.com.tw/search?text=%v&useDefaultSearch=false&pageSize=64&currentPage=%d", prodName, pageNum-1)
-}
-
-func (u *watsonsUtil) getInfo() webInfo {
-	return webInfo{
-		Name:       u.Name,
-		NumPerPage: u.NumPerPage,
-		OnHTML:     u.OnHTML,
-		UserAgent:  u.UserAgent,
-	}
 }
