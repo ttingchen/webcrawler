@@ -26,7 +26,7 @@ type Product struct {
 }
 
 type webUtil interface {
-	onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, result *[]Product) error
+	onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, resultJSON *[]string) error
 	getURL(prodName string, pageNum int) string
 	getInfo() webInfo
 }
@@ -41,12 +41,12 @@ type webInfo struct {
 type watsonsUtil webInfo
 type ebayUtil webInfo
 
-// max product amount for each online store
+// total max product amount
 const (
-	maxProdNum = 100
+	maxProdNum = 500
 )
 
-func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *http.Request) (*[]Product, error) {
+func SearchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *http.Request) (*[]string, error) {
 	var ebayInfo webUtil = &ebayUtil{
 		Name:       "Ebay",
 		NumPerPage: 50,
@@ -65,33 +65,40 @@ func searchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 		watsonInfo,
 	}
 
-	var result []Product
+	var resultJSON []string
 	var mu sync.Mutex
 	c := make(chan error, 2)
+	counter := 0
 
 	for _, website := range websites {
 
 		go func(web webUtil) {
-			crawlWebsite(ctx, c, &mu, web, prodName, &result, w, r)
+			crawlWebsite(ctx, c, &mu, web, prodName, &resultJSON, w, r)
 		}(website)
 	}
+
 	for err := range c {
+		counter++
 		if err != nil {
+			fmt.Println("err:", err)
 			return nil, err
+		}
+		if counter == len(websites) {
+			break
 		}
 	}
 	fmt.Println("done err waiting")
-	return &result, nil
+	return &resultJSON, nil
 }
 
 // scrape product info from website
-func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webutil webUtil, prodName string, result *[]Product, w http.ResponseWriter, r *http.Request) {
+func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webutil webUtil, prodName string, resultJSON *[]string, w http.ResponseWriter, r *http.Request) {
 	Err := ""
 	webinfo := webutil.getInfo()
 	wg := sync.WaitGroup{}
 
 	maxPageNum := (maxProdNum / 2) / webinfo.NumPerPage
-	fmt.Println("new collector: ", webinfo.Name)
+	fmt.Println("new collector:", webinfo.Name)
 	c := colly.NewCollector(
 		colly.Async(true),
 		colly.UserAgent(webinfo.UserAgent),
@@ -111,31 +118,30 @@ func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webu
 
 	c.OnHTML(webinfo.OnHTML, func(e *colly.HTMLElement) {
 		// for each website
-		webutil.onHTMLFunc(e, mu, w, result)
+		webutil.onHTMLFunc(e, mu, w, resultJSON)
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
-		Err = fmt.Sprintln("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
+		fmt.Println("on error")
+		errstr := fmt.Sprintln("Error:", err)
+		Err = Err + errstr
+		wg.Done()
 	})
 
-	c.OnRequest(func(r *colly.Request) {
+	c.OnScraped(func(r *colly.Response) {
 		v := r.Ctx.GetAny("request_ctx")
 		ctx, ok := v.(context.Context)
 		if !ok {
 			fmt.Println("context type error")
-			r.Abort()
 			return
 		}
 		select {
 		case <-ctx.Done(): // 如果 canceled
 			fmt.Println("context done")
-			r.Abort() // 結束 request
 			Err = fmt.Sprintln("context done")
 		default: // 要有 default，不然 select {} 會卡住
 		}
-	})
 
-	c.OnScraped(func(r *colly.Response) {
 		fmt.Println("On Scraped, wait group done")
 		wg.Done()
 	})
@@ -155,14 +161,14 @@ func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webu
 	if Err != "" {
 		errchan <- errors.New(Err)
 		close(errchan)
+		return
 	}
 	errchan <- nil
-
+	return
 }
 
-func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, result *[]Product) (err error) {
-	buf := new(bytes.Buffer)
-	if len(*result) < maxProdNum {
+func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, resultJSON *[]string) (err error) {
+	if len(*resultJSON) < maxProdNum {
 		//avoid to get a null item
 		if e.ChildText("h3[class='s-item__title']") != "" {
 			//use regex to remove the useless part of prodlink
@@ -173,15 +179,16 @@ func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.Respon
 			prodImgLink := e.ChildAttr("img[class='s-item__image-img']", "src")
 			prodPrice := e.ChildText("span[class='s-item__price']")
 
+			m.Lock()
 			prod := Product{prodName, prodPrice, prodImgLink, prodLinkR}
-
-			*result = append(*result, prod)
+			buf := new(bytes.Buffer)
 			if err = json.NewEncoder(buf).Encode(prod); err != nil {
 				fmt.Println(err)
 				return
 			}
-			m.Lock()
-			fmt.Fprintf(w, "Ebay #%v: json.NewEncode:\n", len(*result))
+			str := string(buf.Bytes())
+			*resultJSON = append(*resultJSON, str)
+			fmt.Fprintf(w, "Ebay #%v: json.NewEncode:\n", len(*resultJSON))
 			io.Copy(w, buf)
 			fmt.Fprintf(w, "\n")
 			m.Unlock()
@@ -203,24 +210,24 @@ func (u *ebayUtil) getInfo() webInfo {
 	}
 }
 
-func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, result *[]Product) (err error) {
-	buf := new(bytes.Buffer)
+func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, resultJSON *[]string) (err error) {
 	e.ForEach("e2-product-tile", func(_ int, e *colly.HTMLElement) {
 		time.Sleep(100 * time.Millisecond) // to observe the goroutine
 		prodName := e.ChildText(".productName")
 		prodLink := "https://www.watsons.com.tw" + e.ChildAttr(".ClickSearchResultEvent_Class.gtmAlink", "href")
 		prodImgLink := e.ChildAttr("img", "src")
 		prodPrice := e.ChildText(".productPrice")
-		prod := Product{prodName, prodPrice, prodImgLink, prodLink}
 
-		*result = append(*result, prod)
-		n := len(*result)
+		m.Lock()
+		prod := Product{prodName, prodPrice, prodImgLink, prodLink}
+		buf := new(bytes.Buffer)
 		if err = json.NewEncoder(buf).Encode(prod); err != nil {
 			fmt.Println(err)
 			return
 		}
-		m.Lock()
-		fmt.Fprintf(w, "Watsons #%v: json.NewEncode:\n", n)
+		str := string(buf.Bytes())
+		*resultJSON = append(*resultJSON, str)
+		fmt.Fprintf(w, "Watsons #%v: json.NewEncode:\n", len(*resultJSON))
 		io.Copy(w, buf)
 		fmt.Fprintf(w, "\n")
 		m.Unlock()
