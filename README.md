@@ -15,11 +15,13 @@
 * 搜尋結果有多頁時，可自動依據所設定商品數量計算頁數爬蟲
 * 程式被中斷時，worker 能先將手上任務完成才結束
 * 對於 HTTP Writer 造成的 race condition 以 mutex 進行來避免
+* 若等每一頁的結果都收集好才回傳，User 可能會等很久，UX 不佳；可嘗試 real time render
 
 ## 尚可改進目標
-* 若等每一頁的結果都收集好才回傳，User 可能會等很久，UX 不佳；可嘗試 real time render
 * 運用 Database 建立 cache 機制，特定期限內 user 再次搜尋相同關鍵字，就不用再爬一次，但應避免 hard-code DB 連線資訊
 
 ## 使用方式
-* 打開本地端任一瀏覽器於網址輸入 localhost:`port number`/search?keyword=`your keyword`
-* 或是打開終端機 curl 'localhost:`port number`/search?keyword=`your keyword`'
+* 打開本地端任一瀏覽器於網址輸入 
+  >localhost:`port number`/search?keyword=`your keyword`
+* 或是打開終端機 
+  > curl 'localhost:`port number`/search?keyword=`your keyword`'
