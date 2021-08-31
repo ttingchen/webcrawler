@@ -38,7 +38,6 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 
 		searchResult, err := crawl.SearchWeb(ctx, url.QueryEscape(prodname), w, r)
-		// return if user stop searching
 		if errors.Is(err, context.Canceled) {
 			log.Println("User leave:", err)
 			log.Println("Searched len:", len(*searchResult))
