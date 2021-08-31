@@ -35,15 +35,17 @@ func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.Respon
 			prodName := e.ChildText("h3[class='s-item__title']")
 			prodLink := e.ChildAttr("a[class='s-item__link']", "href")
 			prodLinkR := "<a href=\"" + re.ReplaceAllString(prodLink, "") + "\">click this</a>"
-			prodImgLink := "<img src=\"" + e.ChildAttr("img[class='s-item__image-img']", "src") + "\" width=\"400\" height=\"500\">"
+			prodImgLink := "<img src=\"" + e.ChildAttr("img[class='s-item__image-img']", "src") + "\" width=\"200\">"
 			prodPrice := e.ChildText("span[class='s-item__price']")
 
 			m.Lock()
+			fmt.Fprintf(w, "<div style = \"font-family:courier,arial,helvetica;\">")
 			fmt.Fprintf(w, "Ebay #%v:<br>", len(*resultJSON)+1)
 			fmt.Fprintf(w, "Name: %v<br>", prodName)
 			fmt.Fprintf(w, "ProdLink: %v<br>", prodLinkR)
 			fmt.Fprintf(w, "ImageLink: %v<br>", prodImgLink)
 			fmt.Fprintf(w, "Price: %v<br><br>", prodPrice)
+			fmt.Fprintf(w, "</div>")
 
 			prod := Product{prodName, prodPrice, prodImgLink, prodLinkR}
 			buf := new(bytes.Buffer)
@@ -79,15 +81,17 @@ func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.Res
 		time.Sleep(100 * time.Millisecond)
 		prodName := e.ChildText(".productName")
 		prodLink := "<a href=\"https://www.watsons.com.tw" + e.ChildAttr(".ClickSearchResultEvent_Class.gtmAlink", "href") + "\">click this</a>"
-		prodImgLink := "<img src=\"" + e.ChildAttr("img", "src") + "\" width=\"400\" height=\"500\">"
+		prodImgLink := "<img src=\"" + e.ChildAttr("img", "src") + "\" width=\"200\">"
 		prodPrice := e.ChildText(".productPrice")
 
 		m.Lock()
+		fmt.Fprintf(w, "<div style = \"font-family:courier,arial,helvetica;\">")
 		fmt.Fprintf(w, "Watsons #%v:<br>", len(*resultJSON)+1)
 		fmt.Fprintf(w, "Name: %v<br>", prodName)
 		fmt.Fprintf(w, "ProdLink: %v<br>", prodLink)
 		fmt.Fprintf(w, "ImageLink: %v<br>", prodImgLink)
 		fmt.Fprintf(w, "Price: %v<br><br>", prodPrice)
+		fmt.Fprintf(w, "</div>")
 
 		prod := Product{prodName, prodPrice, prodImgLink, prodLink}
 		buf := new(bytes.Buffer)
