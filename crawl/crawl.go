@@ -50,6 +50,7 @@ func SearchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 
 	var resultJSON []string
 	var mu sync.Mutex
+	var Err error
 	c := make(chan error, 2)
 	counter := 0
 
@@ -62,15 +63,14 @@ func SearchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 	for err := range c {
 		counter++
 		if err != nil {
-			fmt.Println("err:", err)
-			return nil, err
+			Err = err
 		}
 		if counter == len(websites) {
 			break
 		}
 	}
 	fmt.Println("done err waiting")
-	return &resultJSON, nil
+	return &resultJSON, Err
 }
 
 // LogResults logs the scraped results.
