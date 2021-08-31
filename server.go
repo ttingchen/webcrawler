@@ -1,7 +1,6 @@
 package main
 
 import (
-	"Go_WebService/crawl"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +8,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"Go_WebService/crawl"
 )
 
 func main() {
@@ -37,7 +38,8 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 
 		searchResult, err := crawl.SearchWeb(ctx, url.QueryEscape(prodname), w, r)
-		if errors.Is(err, context.Canceled) { // 若用戶中離，結束
+		// return if user stop searching
+		if errors.Is(err, context.Canceled) {
 			log.Println("User leave:", err)
 			log.Println("Searched len:", len(*searchResult))
 			return
