@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"regexp"
-	"strconv"
 	"sync"
 	"time"
 
@@ -58,7 +57,7 @@ func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.Respon
 }
 
 func (u *ebayUtil) getURL(prodName string, pageNum int) string {
-	return "https://www.ebay.com/sch/i.html?_nkw=" + prodName + "&_ipg=50&_pgn=" + strconv.Itoa(pageNum)
+	return fmt.Sprintf("https://www.ebay.com/sch/i.html?_nkw=%v&_ipg=50&_pgn=%d", prodName, pageNum)
 }
 
 func (u *ebayUtil) getInfo() webInfo {
@@ -72,7 +71,8 @@ func (u *ebayUtil) getInfo() webInfo {
 
 func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, resultJSON *[]string) (err error) {
 	e.ForEach("e2-product-tile", func(_ int, e *colly.HTMLElement) {
-		time.Sleep(100 * time.Millisecond) // to observe the goroutine
+		// add sleep() to observe the goroutine
+		time.Sleep(100 * time.Millisecond)
 		prodName := e.ChildText(".productName")
 		prodLink := "https://www.watsons.com.tw" + e.ChildAttr(".ClickSearchResultEvent_Class.gtmAlink", "href")
 		prodImgLink := e.ChildAttr("img", "src")

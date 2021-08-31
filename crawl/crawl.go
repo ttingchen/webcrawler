@@ -19,7 +19,7 @@ const (
 	maxProdNum = 500
 )
 
-// Product is product
+// Product is the struct of product information including name, price, imagelink, url.
 type Product struct {
 	Name  string `json:"Name"`
 	Price string `json:"Price"`
@@ -86,10 +86,10 @@ func LogResults(ctx context.Context, searchResult *[]string) error {
 		}
 
 		var product Product
-		if err := json.NewDecoder(strings.NewReader(result)).Decode(&product); err == nil {
-			fmt.Printf("Total #%d : \n%v\n%v\n%v\n%v\n\n", i+1, product.Name, product.URL, product.Image, product.Price)
-		} else {
+		if err := json.NewDecoder(strings.NewReader(result)).Decode(&product); err != nil {
 			return err
+		} else {
+			fmt.Printf("Total #%d : \n%v\n%v\n%v\n%v\n\n", i+1, product.Name, product.URL, product.Image, product.Price)
 		}
 	}
 	return nil
@@ -107,20 +107,22 @@ func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webu
 		colly.UserAgent(webinfo.UserAgent),
 	)
 
-	collyctx := colly.NewContext()    // 建立新的 colly.Context
-	collyctx.Put("request_ctx", rctx) // 把 request context 放進 colly
+	// create a new colly.Context
+	collyctx := colly.NewContext()
+	// put request context into colly
+	collyctx.Put("request_ctx", rctx)
 
 	c.Limit(&colly.LimitRule{
-		// Set a delay between requests to these domains
+		// set a delay between requests to these domains
 		Delay: 3 * time.Second,
-		// Add an additional random delay
+		// add an additional random delay
 		RandomDelay: 15 * time.Second,
 
 		Parallelism: 3,
 	})
 
 	c.OnHTML(webinfo.OnHTML, func(e *colly.HTMLElement) {
-		// for each website
+		// implented different interface for each website
 		webutil.onHTMLFunc(e, mu, w, resultJSON)
 	})
 
@@ -139,17 +141,18 @@ func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webu
 			return
 		}
 		select {
-		case <-ctx.Done(): // 如果 canceled
+		// if canceled
+		case <-ctx.Done():
 			fmt.Println("context done")
 			Err = fmt.Sprintln("context done")
-		default: // 要有 default，不然 select {} 會卡住
+		// use default to avoid being stuck in select{}
+		default:
 		}
 
 		fmt.Println("On Scraped, wait group done")
 		wg.Done()
 	})
 
-	//load 1 to pageNum pages
 	for pageNum := 1; pageNum <= maxPageNum; pageNum++ {
 		visitURL := webutil.getURL(prodName, pageNum)
 		wg.Add(1)
