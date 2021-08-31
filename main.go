@@ -43,11 +43,10 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 		}
 		if err != nil {
 			log.Println("Unexpected errors: ", err)
-			// time.Sleep(time.Second * 5)
-		} else {
-			if err := crawl.LogResults(ctx, searchResult); err != nil {
-				log.Println("Failed to log results:", err)
-			}
+			return
+		}
+		if err := crawl.LogResults(ctx, searchResult); err != nil {
+			log.Println("Failed to log results:", err)
 		}
 	}
 }
