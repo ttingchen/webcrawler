@@ -5,6 +5,7 @@
 ## 基本架構
 * 利用 HTTP Handler 建構一個基礎的 Web API
 * 利用第三方爬蟲框架 Colly 來實現爬蟲的基本需求
+* 利用 JSON 來儲存爬蟲結果，提供了資料的高相容性以及未來擴展開發的便利性
 
 ## 其他細節
 * 爬下來的商品資訊包含：名稱、價錢、圖片連結、商品連結
@@ -32,3 +33,5 @@
   
   ![search_cmd](https://user-images.githubusercontent.com/10221555/131459999-51f7a9b0-4a79-41cc-a5dc-e9b593bdd02c.png)
 
+## 爬蟲結果
+<img width="1438" alt="search_result" src="https://user-images.githubusercontent.com/10221555/131463539-014f85ac-a046-4762-ae01-9761d1adcbe4.png">
