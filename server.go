@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -22,10 +24,10 @@ func main() {
 
 func collyCrawler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Enter crawl")
-	ctx := r.Context()
 
 	r.ParseForm()
 	for k, v := range r.Form {
+		ctx := r.Context()
 		fmt.Println("key:", k)
 		fmt.Println("val:", strings.Join(v, ""))
 		prodname := strings.Join(v, "")
@@ -36,8 +38,14 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 
 		searchResult, err := crawl.SearchWeb(ctx, url.QueryEscape(prodname), w, r)
+		// return if user stop searching
+		if errors.Is(err, context.Canceled) {
+			log.Println("User leave:", err)
+			log.Println("Searched len:", len(*searchResult))
+			return
+		}
 		if err != nil {
-			log.Fatal("Failed to search: ", err)
+			log.Fatal("Unexpected errors: ", err)
 		}
 
 		if err := crawl.LogResults(ctx, searchResult); err != nil {

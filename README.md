@@ -27,4 +27,4 @@
 * 避免頻繁的 request 導致購物網站誤判 DDoS 攻擊，請注意 rate limit
 * 避免商品太多，可設定數量上限，或是過濾缺貨商品
 
-## 合作很重要，請把專案上傳 Github（GitLab 或其他 repostory provider 亦可）
+## 合作很重要，請把專案上傳 Github（GitLab 或其他 repository provider 亦可）
