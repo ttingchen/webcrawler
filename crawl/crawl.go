@@ -3,6 +3,7 @@ package crawl
 import (
 	"context"
 	"encoding/json"
+	// "errors"
 	"errors"
 	"fmt"
 	"log"
@@ -96,7 +97,7 @@ func LogResults(ctx context.Context, searchResult *[]string) error {
 }
 
 func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webutil webUtil, prodName string, resultJSON *[]string, w http.ResponseWriter) {
-	Err := ""
+	var Err error
 	webinfo := webutil.getInfo()
 	wg := sync.WaitGroup{}
 
@@ -126,8 +127,7 @@ func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webu
 
 	c.OnError(func(r *colly.Response, err error) {
 		fmt.Println("on error")
-		errstr := fmt.Sprintln("Error:", err)
-		Err = Err + errstr
+		Err = errors.New(fmt.Sprintln(Err, err))
 		wg.Done()
 	})
 
@@ -141,11 +141,10 @@ func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webu
 		select {
 		case <-ctx.Done(): // 如果 canceled
 			fmt.Println("context done")
-			Err = fmt.Sprintln("context done")
+			Err = context.Canceled
 		default: // 要有 default，不然 select {} 會卡住
 		}
 
-		fmt.Println("On Scraped, wait group done")
 		wg.Done()
 	})
 
@@ -161,9 +160,8 @@ func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webu
 	wg.Wait()
 	fmt.Println("Done waiting")
 
-	if Err != "" {
-		errchan <- errors.New(Err)
-		close(errchan)
+	if Err != nil {
+		errchan <- Err
 		return
 	}
 	errchan <- nil
