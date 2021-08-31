@@ -3,7 +3,6 @@ package crawl
 import (
 	"context"
 	"encoding/json"
-	// "errors"
 	"errors"
 	"fmt"
 	"log"
@@ -15,10 +14,8 @@ import (
 	"github.com/gocolly/colly"
 )
 
-// total max product amount
-const (
-	maxProdNum = 500
-)
+// Total max product amount.
+const maxProdNum = 500
 
 // Product is the struct of product information including name, price, imagelink, url.
 type Product struct {
@@ -114,21 +111,20 @@ func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webu
 	collyctx.Put("request_ctx", rctx)
 
 	c.Limit(&colly.LimitRule{
-		// set a delay between requests to these domains
-		Delay: 3 * time.Second,
-		// add an additional random delay
-		RandomDelay: 15 * time.Second,
-
+		Delay:       3 * time.Second,  // set a delay between requests to these domains
+		RandomDelay: 15 * time.Second, // add an additional random delay
 		Parallelism: 3,
 	})
 
 	c.OnHTML(webinfo.OnHTML, func(e *colly.HTMLElement) {
 		// implented different interface for each website
-		webutil.onHTMLFunc(e, mu, w, resultJSON)
+		if err := webutil.onHTMLFunc(e, mu, w, resultJSON); err != nil {
+			Err = errors.New(fmt.Sprintln(Err, err))
+		}
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
-		fmt.Println("on error")
+		fmt.Println("On error")
 		Err = errors.New(fmt.Sprintln(Err, err))
 		wg.Done()
 	})
@@ -137,15 +133,14 @@ func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webu
 		v := r.Ctx.GetAny("request_ctx")
 		ctx, ok := v.(context.Context)
 		if !ok {
-			fmt.Println("context type error")
+			fmt.Println("Context type error")
 			return
 		}
 		select {
-		// if canceled
 		case <-ctx.Done():
-			fmt.Println("context done")
+			fmt.Println("Context done")
 			Err = context.Canceled
-		default: // 要有 default，不然 select {} 會卡住
+		default:
 		}
 
 		wg.Done()
