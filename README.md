@@ -1,16 +1,18 @@
-# Go_WebService
+# Golang-WebCrawler
 ## Description
 
 請設計一個 Web Service，輸入關鍵字後，搜尋購物網站並把結果呈現出來
 
 ## 需求
+* **RESTful API**
+* **善用 interface 抽換底層實作，讓 code 具有延展性，並更容易測試**
+* **Use context to replace flag shutdown**
 * 至少兩個購物網站
 * 商品資訊至少包含：名稱、價錢、圖片連結、商品連結
 * Exported functions / variables 要有註解
 * 要寫 Unit test
 * 運用 worker 技巧，並提供 flag 設定單一網站最多 workers 數量
 * 搜尋結果有多頁時，也要爬下來
-* 善用 interface 抽換底層實作，讓 code 具有延展性，並更容易測試
 * 程式被中斷時，worker 必須把手上任務完成才結束
 
 ## 加分
@@ -24,5 +26,3 @@
 * 善用 opensource libraries
 * 避免頻繁的 request 導致購物網站誤判 DDoS 攻擊，請注意 rate limit
 * 避免商品太多，可設定數量上限，或是過濾缺貨商品
-
-## 合作很重要，請把專案上傳 Github（GitLab 或其他 repostory provider 亦可）
