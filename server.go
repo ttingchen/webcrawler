@@ -1,7 +1,6 @@
 package main
 
 import (
-	"Go_WebService/crawl"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +8,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"Go_WebService/crawl"
 )
 
 func main() {
