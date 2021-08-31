@@ -34,4 +34,4 @@
   ![search_cmd](https://user-images.githubusercontent.com/10221555/131459999-51f7a9b0-4a79-41cc-a5dc-e9b593bdd02c.png)
 
 ## 爬蟲結果
-<img width="1438" alt="search_result" src="https://user-images.githubusercontent.com/10221555/131463539-014f85ac-a046-4762-ae01-9761d1adcbe4.png">
+![search_result](https://user-images.githubusercontent.com/10221555/131483137-4a9eaaa1-bc45-4d31-ac55-256012c59034.gif)
