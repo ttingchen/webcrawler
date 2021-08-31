@@ -24,7 +24,7 @@ func main() {
 
 func collyCrawler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Enter crawl")
-
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	r.ParseForm()
 	for k, v := range r.Form {
 		ctx := r.Context()
@@ -40,8 +40,6 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 		searchResult, err := crawl.SearchWeb(ctx, url.QueryEscape(prodname), w, r)
 		if errors.Is(err, context.Canceled) {
 			log.Println("User leave:", err)
-			log.Println("Searched len:", len(*searchResult))
-			return
 		}
 		if err != nil {
 			log.Println("Unexpected errors: ", err)
