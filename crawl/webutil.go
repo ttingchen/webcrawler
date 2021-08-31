@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
 	"sync"
 	"time"
@@ -34,16 +35,23 @@ func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.Respon
 			re := regexp.MustCompile(`\?(.*)`)
 			prodName := e.ChildText("h3[class='s-item__title']")
 			prodLink := e.ChildAttr("a[class='s-item__link']", "href")
-			prodLinkR := "<a href=\"" + re.ReplaceAllString(prodLink, "") + "\">click this</a>"
-			prodImgLink := "<img src=\"" + e.ChildAttr("img[class='s-item__image-img']", "src") + "\" width=\"400\" height=\"500\">"
+			prodLinkR := re.ReplaceAllString(prodLink, "")
+			prodImgLink := e.ChildAttr("img[class='s-item__image-img']", "src")
 			prodPrice := e.ChildText("span[class='s-item__price']")
 
 			m.Lock()
-			fmt.Fprintf(w, "Ebay #%v:<br>", len(*resultJSON)+1)
-			fmt.Fprintf(w, "Name: %v<br>", prodName)
-			fmt.Fprintf(w, "ProdLink: %v<br>", prodLinkR)
-			fmt.Fprintf(w, "ImageLink: %v<br>", prodImgLink)
-			fmt.Fprintf(w, "Price: %v<br><br>", prodPrice)
+			unescLink, _ := url.QueryUnescape(prodLinkR)
+			sec := `<div style = "font-family:Calibri,arial,helvetica;">
+					<div>Ebay #` + fmt.Sprint(len(*resultJSON)+1) + `</div>
+					<a href="` + unescLink + `">
+						<img src="` + prodImgLink + `" width="200">
+					</a> 
+					<div>
+						<a href="` + unescLink + `">` + prodName + `</a>
+					</div>
+					<div>` + prodPrice + `</div><br>
+				</div>`
+			fmt.Fprintf(w, sec)
 
 			prod := Product{prodName, prodPrice, prodImgLink, prodLinkR}
 			buf := new(bytes.Buffer)
@@ -81,16 +89,23 @@ func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.Res
 		// add sleep() to observe the goroutine
 		time.Sleep(100 * time.Millisecond)
 		prodName := e.ChildText(".productName")
-		prodLink := "<a href=\"https://www.watsons.com.tw\"" + e.ChildAttr(".ClickSearchResultEvent_Class.gtmAlink", "href") + "\">click this</a>"
-		prodImgLink := "<img src=\"" + e.ChildAttr("img", "src") + "\" width=\"400\" height=\"500\">"
+		prodLink := "https://www.watsons.com.tw" + e.ChildAttr(".ClickSearchResultEvent_Class.gtmAlink", "href")
+		prodImgLink := e.ChildAttr("img", "src")
 		prodPrice := e.ChildText(".productPrice")
 
 		m.Lock()
-		fmt.Fprintf(w, "Watsons #%v:<br>", len(*resultJSON)+1)
-		fmt.Fprintf(w, "Name: %v<br>", prodName)
-		fmt.Fprintf(w, "ProdLink: %v<br>", prodLink)
-		fmt.Fprintf(w, "ImageLink: %v<br>", prodImgLink)
-		fmt.Fprintf(w, "Price: %v<br><br>", prodPrice)
+		unescLink, _ := url.QueryUnescape(prodLink)
+		sec := `<div style = "font-family:Calibri,arial,helvetica;">
+					<div>Watson #` + fmt.Sprint(len(*resultJSON)+1) + `</div>
+					<a href="` + unescLink + `">
+						<img src="` + prodImgLink + `" width="200">
+					</a> 
+					<div>
+						<a href="` + unescLink + `">` + prodName + `</a>
+					</div>
+					<div>` + prodPrice + `</div><br>
+				</div>`
+		fmt.Fprintf(w, sec)
 
 		prod := Product{prodName, prodPrice, prodImgLink, prodLink}
 		buf := new(bytes.Buffer)
@@ -100,9 +115,6 @@ func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.Res
 		}
 		str := string(buf.Bytes())
 		*resultJSON = append(*resultJSON, str)
-		// fmt.Fprintf(w, "Watsons #%v: json.NewEncode:\n", len(*resultJSON))
-		// io.Copy(w, buf)
-		// fmt.Fprintf(w, "\n")
 		m.Unlock()
 
 	})
