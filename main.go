@@ -40,15 +40,13 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 		searchResult, err := crawl.SearchWeb(ctx, url.QueryEscape(prodname), w, r)
 		if errors.Is(err, context.Canceled) {
 			log.Println("User leave:", err)
-			log.Println("Searched len:", len(*searchResult))
-			return
 		}
 		if err != nil {
-			log.Fatal("Unexpected errors: ", err)
-		}
-
-		if err := crawl.LogResults(ctx, searchResult); err != nil {
-			log.Println("Failed to log results:", err)
+			log.Println("Unexpected errors: ", err)
+		} else {
+			if err := crawl.LogResults(ctx, searchResult); err != nil {
+				log.Println("Failed to log results:", err)
+			}
 		}
 	}
 }
