@@ -23,6 +23,7 @@ type webInfo struct {
 	Name       string
 	NumPerPage int
 	OnHTML     string
+	Parallel   int
 	UserAgent  string
 }
 
@@ -65,6 +66,7 @@ func (u *ebayUtil) getInfo() webInfo {
 		Name:       u.Name,
 		NumPerPage: u.NumPerPage,
 		OnHTML:     u.OnHTML,
+		Parallel:   u.Parallel,
 		UserAgent:  u.UserAgent,
 	}
 }
@@ -106,6 +108,7 @@ func (u *watsonsUtil) getInfo() webInfo {
 		Name:       u.Name,
 		NumPerPage: u.NumPerPage,
 		OnHTML:     u.OnHTML,
+		Parallel:   u.Parallel,
 		UserAgent:  u.UserAgent,
 	}
 }
