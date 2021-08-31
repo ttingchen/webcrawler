@@ -34,12 +34,14 @@ func SearchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 		Name:       "Ebay",
 		NumPerPage: 50,
 		OnHTML:     "div[class='s-item__wrapper clearfix']",
+		Parallel:   13,
 		UserAgent:  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36",
 	}
 	var watsonInfo webUtil = &watsonsUtil{
 		Name:       "Watsons",
 		NumPerPage: 64,
 		OnHTML:     "e2-product-list",
+		Parallel:   3,
 		UserAgent:  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36",
 	}
 
@@ -51,16 +53,16 @@ func SearchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 	var resultJSON []string
 	var mu sync.Mutex
 	var Err error
-	c := make(chan error, 2)
+	ch := make(chan error, 2)
 	counter := 0
 
 	for _, website := range websites {
 		go func(web webUtil) {
-			crawlWebsite(ctx, c, &mu, web, prodName, &resultJSON, w)
+			crawlWebsite(ctx, ch, &mu, web, prodName, &resultJSON, w)
 		}(website)
 	}
 
-	for err := range c {
+	for err := range ch {
 		counter++
 		if err != nil {
 			Err = err
@@ -69,7 +71,7 @@ func SearchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 			break
 		}
 	}
-	fmt.Println("done err waiting")
+	fmt.Println("Done err waiting")
 	return &resultJSON, Err
 }
 
@@ -86,9 +88,9 @@ func LogResults(ctx context.Context, searchResult *[]string) error {
 		var product Product
 		if err := json.NewDecoder(strings.NewReader(result)).Decode(&product); err != nil {
 			return err
-		} else {
-			fmt.Printf("Total #%d : \n%v\n%v\n%v\n%v\n\n", i+1, product.Name, product.URL, product.Image, product.Price)
 		}
+		fmt.Printf("Total #%d : \n%v\n%v\n%v\n%v\n\n", i+1, product.Name, product.URL, product.Image, product.Price)
+
 	}
 	return nil
 }
@@ -113,7 +115,7 @@ func crawlWebsite(rctx context.Context, errchan chan error, mu *sync.Mutex, webu
 	c.Limit(&colly.LimitRule{
 		Delay:       3 * time.Second,  // set a delay between requests to these domains
 		RandomDelay: 15 * time.Second, // add an additional random delay
-		Parallelism: 3,
+		Parallelism: webinfo.Parallel,
 	})
 
 	c.OnHTML(webinfo.OnHTML, func(e *colly.HTMLElement) {
