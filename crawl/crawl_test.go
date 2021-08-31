@@ -40,7 +40,7 @@ func TestSearchWeb(t *testing.T) {
 				ctx := r.Context()
 				searchResult, err := SearchWeb(ctx, url.QueryEscape(tt.prodName), w, r)
 				if err != nil || len(*searchResult) == 0 {
-					t.Fatalf("Search failed with err %s and search length %d", err, len(*searchResult))
+					t.Fatalf("Search failed with err: %v and search length: %d", err, len(*searchResult))
 				}
 				t.Log("Length of search results:", len(*searchResult))
 			})
