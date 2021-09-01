@@ -90,7 +90,7 @@ func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.Res
 		time.Sleep(100 * time.Millisecond)
 		prodName := e.ChildText(".productName")
 		prodLink := "https://www.watsons.com.tw" + e.ChildAttr(".ClickSearchResultEvent_Class.gtmAlink", "href")
-		prodImgLink := e.ChildAttr("img", "src")
+		prodImgLink := e.ChildAttr("e2-media>img", "src")
 		prodPrice := e.ChildText(".productPrice")
 
 		m.Lock()
