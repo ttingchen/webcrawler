@@ -34,4 +34,6 @@
   ![search_cmd](https://user-images.githubusercontent.com/10221555/131459999-51f7a9b0-4a79-41cc-a5dc-e9b593bdd02c.png)
 
 ## 爬蟲結果
-![search_result](https://user-images.githubusercontent.com/10221555/131483137-4a9eaaa1-bc45-4d31-ac55-256012c59034.gif)
+![search_result](https://user-images.githubusercontent.com/10221555/131598653-25ee7613-1526-4a79-938d-f1504966974b.gif)
+![search_result2](https://user-images.githubusercontent.com/10221555/131598657-307500f9-676a-4068-b518-91b3a0aaa3d0.gif)
+
