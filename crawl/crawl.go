@@ -65,7 +65,11 @@ func SearchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 	for err := range ch {
 		counter++
 		if err != nil {
-			Err = err
+			if Err == nil {
+				Err = err
+			} else {
+				Err = fmt.Errorf("%v;%v", Err, err)
+			}
 		}
 		if counter == len(websites) {
 			break
