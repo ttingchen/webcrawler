@@ -30,31 +30,33 @@ type ebayUtil webInfo
 
 // SearchWeb uses a colly collector to crawl for each website.
 func SearchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *http.Request) (*[]string, error) {
-	var ebayInfo webUtil = &ebayUtil{
-		Name:       "Ebay",
-		NumPerPage: 50,
-		OnHTML:     "div[class='s-item__wrapper clearfix']",
-		Parallel:   13,
-		UserAgent:  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36",
-	}
-	var watsonInfo webUtil = &watsonsUtil{
-		Name:       "Watsons",
-		NumPerPage: 64,
-		OnHTML:     "e2-product-list",
-		Parallel:   3,
-		UserAgent:  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36",
-	}
+	var (
+		ebayInfo webUtil = &ebayUtil{
+			Name:       "Ebay",
+			NumPerPage: 50,
+			OnHTML:     "div[class='s-item__wrapper clearfix']",
+			Parallel:   13,
+			UserAgent:  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36",
+		}
+		watsonInfo webUtil = &watsonsUtil{
+			Name:       "Watsons",
+			NumPerPage: 64,
+			OnHTML:     "e2-product-list",
+			Parallel:   3,
+			UserAgent:  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36",
+		}
 
-	websites := []webUtil{
-		ebayInfo,
-		watsonInfo,
-	}
+		websites = []webUtil{
+			ebayInfo,
+			watsonInfo,
+		}
 
-	var resultJSON []string
-	var mu sync.Mutex
-	var Err error
-	ch := make(chan error, 2)
-	counter := 0
+		resultJSON []string
+		mu         sync.Mutex
+		Err        error
+		ch         = make(chan error, 2)
+		counter    = 0
+	)
 
 	for _, website := range websites {
 		go func(web webUtil) {
