@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	"Go_WebService/crawl"
+	"github.com/ttingchen/Golang-WebCrawler/crawl"
 )
 
 func main() {

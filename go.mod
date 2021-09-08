@@ -1,4 +1,4 @@
-module Go_WebService
+module github.com/ttingchen/Golang-WebCrawler
 
 go 1.16
 
@@ -11,6 +11,6 @@ require (
 	github.com/kennygrant/sanitize v1.2.4 // indirect
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
-	golang.org/x/net v0.0.0-20210825183410-e898025ed96a // indirect
+	golang.org/x/net v0.0.0-20210907225631-ff17edfbf26d // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 )
