@@ -29,7 +29,7 @@ type watsonsUtil webInfo
 type ebayUtil webInfo
 
 // SearchWeb uses a colly collector to crawl for each website.
-func SearchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *http.Request) (*[]string, error) {
+func SearchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *http.Request) ([]string, error) {
 	var (
 		ebayInfo webUtil = &ebayUtil{
 			Name:       "Ebay",
@@ -78,13 +78,13 @@ func SearchWeb(ctx context.Context, prodName string, w http.ResponseWriter, r *h
 		}
 	}
 	fmt.Println("Done err waiting")
-	return &resultJSON, Err
+	return resultJSON, Err
 }
 
 // LogResults logs the scraped results.
-func LogResults(ctx context.Context, searchResult *[]string) error {
+func LogResults(ctx context.Context, searchResult []string) error {
 	fmt.Println("Start to log results")
-	for i, result := range *searchResult {
+	for i, result := range searchResult {
 		select {
 		case <-ctx.Done():
 			return context.Canceled

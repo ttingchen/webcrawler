@@ -77,7 +77,6 @@ func TestLogResults(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
 		{
 			name: "normal",
 			args: args{
