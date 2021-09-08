@@ -22,6 +22,9 @@
 * 運用 Database 建立 cache 機制，特定期限內 user 再次搜尋相同關鍵字，就不用再爬一次，但應避免 hard-code DB 連線資訊
 
 ## 使用方式
+* 打開終端機到程式所在位置輸入 
+  >go run main.go
+
 * 打開本地端任一瀏覽器於網址輸入 
   >localhost:`port number`/search?keyword=`your keyword`
   
