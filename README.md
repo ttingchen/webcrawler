@@ -43,3 +43,5 @@
 * Server端
 ![search_result2](https://user-images.githubusercontent.com/10221555/131598657-307500f9-676a-4068-b518-91b3a0aaa3d0.gif)
 
+## Unit-test
+  >go test -v ./...
