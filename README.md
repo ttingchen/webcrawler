@@ -1,6 +1,6 @@
 # webcrawler
 ## 簡介
-設計一個 Web Service，能依據關鍵字對兩個購物網站 (Waston, Ebay )進行爬蟲，並將結果呈現出來
+設計一個 Web Service，能依據關鍵字對兩個購物網站 (Waston, Ebay)進行爬蟲，並將結果呈現出來
 
 ## 基本架構
 * 利用 HTTP Handler 建構一個基礎的 Web API
