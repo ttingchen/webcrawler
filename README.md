@@ -35,13 +35,13 @@
   > curl 'localhost:`port number`/search?keyword=`your keyword`'
   
   ![search_cmd](https://user-images.githubusercontent.com/10221555/131459999-51f7a9b0-4a79-41cc-a5dc-e9b593bdd02c.png)
-
+  
+* Unit-test
+  >go test -v ./...
+  
 ## 爬蟲結果
 * Client端
 ![search_result](https://user-images.githubusercontent.com/10221555/131598653-25ee7613-1526-4a79-938d-f1504966974b.gif)
 
 * Server端
 ![search_result2](https://user-images.githubusercontent.com/10221555/131598657-307500f9-676a-4068-b518-91b3a0aaa3d0.gif)
-
-## Unit-test
-  >go test -v ./...
