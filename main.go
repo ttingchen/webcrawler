@@ -33,7 +33,7 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	for k, v := range r.Form {
 		ctx, cancel := context.WithCancel(r.Context())
-		_ = withContextFunc(ctx, func() {
+		shutdown(ctx, func() {
 			cancel()
 			wg.Wait()
 			log.Fatal("Graceful shutdown")
@@ -66,7 +66,7 @@ func collyCrawler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func withContextFunc(ctx context.Context, f func()) context.Context {
+func shutdown(ctx context.Context, f func()) {
 	go func() {
 		c := make(chan os.Signal)
 		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
@@ -77,6 +77,4 @@ func withContextFunc(ctx context.Context, f func()) context.Context {
 			f()
 		}
 	}()
-
-	return ctx
 }
