@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -13,11 +14,19 @@ import (
 	"github.com/gocolly/colly"
 )
 
+type prodInfo struct {
+	Name     string
+	Number   string
+	ImgLink  string
+	ProdLink string
+	ProdName string
+	Price    string
+}
+
 type webUtil interface {
 	onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, resultJSON *[]string) error
 	getURL(prodName string, pageNum int) string
 	getInfo() webInfo
-	writeHTMLformatting(w http.ResponseWriter, resultJSON *[]string, unescLink string, prodImgLink string, prodName string, prodPrice string)
 }
 
 type webInfo struct {
@@ -42,7 +51,10 @@ func (u *ebayUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.Respon
 
 			m.Lock()
 			unescLink, _ := url.QueryUnescape(prodLinkR)
-			u.writeHTMLformatting(w, resultJSON, unescLink, prodImgLink, prodName, prodPrice)
+			data := prodInfo{u.Name, fmt.Sprint(len(*resultJSON) + 1), prodImgLink, unescLink, prodName, prodPrice}
+			if err = writeHTMLformatting(w, data); err != nil {
+				return
+			}
 
 			prod := Product{prodName, prodPrice, prodImgLink, prodLinkR}
 			buf := new(bytes.Buffer)
@@ -72,19 +84,25 @@ func (u *ebayUtil) getInfo() webInfo {
 	}
 }
 
-func (u *ebayUtil) writeHTMLformatting(w http.ResponseWriter, resultJSON *[]string, unescLink string, prodImgLink string, prodName string, prodPrice string) {
-	sec := `<div style = "font-family:Calibri,arial,helvetica;">
-					<div>` + u.Name + ` #` + fmt.Sprint(len(*resultJSON)+1) + `</div>
-					<a href="` + unescLink + `">
-						<img src="` + prodImgLink + `" width="200">
+func writeHTMLformatting(w http.ResponseWriter, data prodInfo) error {
+	const sec = `<div style = "font-family:Calibri,arial,helvetica;">
+					<div>{{.Name}} #{{.Number}}</div>
+					<a href="{{.ProdLink}}">
+						<img src="{{.ImgLink}}" width="200">
 					</a> 
 					<div>
-						<a href="` + unescLink + `">` + prodName + `</a>
+						<a href="{{.ProdLink}}">{{.ProdName}}</a>
 					</div>
-					<div>` + prodPrice + `</div><br>
+					<div>{{.Price}}</div><br>
 				</div>`
 
-	fmt.Fprintf(w, sec)
+	t, err := template.New("product").Parse(sec)
+	if err != nil {
+		return err
+	}
+	err = t.Execute(w, data)
+	fmt.Fprintf(w, "\n")
+	return nil
 }
 
 func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, resultJSON *[]string) (err error) {
@@ -98,7 +116,10 @@ func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.Res
 
 		m.Lock()
 		unescLink, _ := url.QueryUnescape(prodLink)
-		u.writeHTMLformatting(w, resultJSON, unescLink, prodImgLink, prodName, prodPrice)
+		data := prodInfo{u.Name, fmt.Sprint(len(*resultJSON) + 1), prodImgLink, unescLink, prodName, prodPrice}
+		if err = writeHTMLformatting(w, data); err != nil {
+			return
+		}
 
 		prod := Product{prodName, prodPrice, prodImgLink, prodLink}
 		buf := new(bytes.Buffer)
@@ -127,19 +148,4 @@ func (u *watsonsUtil) getInfo() webInfo {
 		Parallel:   u.Parallel,
 		UserAgent:  u.UserAgent,
 	}
-}
-
-func (u *watsonsUtil) writeHTMLformatting(w http.ResponseWriter, resultJSON *[]string, unescLink string, prodImgLink string, prodName string, prodPrice string) {
-	sec := `<div style = "font-family:Calibri,arial,helvetica;">
-					<div>` + u.Name + ` #` + fmt.Sprint(len(*resultJSON)+1) + `</div>
-					<a href="` + unescLink + `">
-						<img src="` + prodImgLink + `" width="200">
-					</a> 
-					<div>
-						<a href="` + unescLink + `">` + prodName + `</a>
-					</div>
-					<div>` + prodPrice + `</div><br>
-				</div>`
-
-	fmt.Fprintf(w, sec)
 }
