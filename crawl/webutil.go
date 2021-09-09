@@ -84,27 +84,6 @@ func (u *ebayUtil) getInfo() webInfo {
 	}
 }
 
-func writeHTMLformatting(w http.ResponseWriter, data prodInfo) error {
-	const sec = `<div style = "font-family:Calibri,arial,helvetica;">
-					<div>{{.Name}} #{{.Number}}</div>
-					<a href="{{.ProdLink}}">
-						<img src="{{.ImgLink}}" width="200">
-					</a> 
-					<div>
-						<a href="{{.ProdLink}}">{{.ProdName}}</a>
-					</div>
-					<div>{{.Price}}</div><br>
-				</div>`
-
-	t, err := template.New("product").Parse(sec)
-	if err != nil {
-		return err
-	}
-	err = t.Execute(w, data)
-	fmt.Fprintf(w, "\n")
-	return nil
-}
-
 func (u *watsonsUtil) onHTMLFunc(e *colly.HTMLElement, m *sync.Mutex, w http.ResponseWriter, resultJSON *[]string) (err error) {
 	e.ForEach("e2-product-tile", func(_ int, e *colly.HTMLElement) {
 		// add sleep() to observe the goroutine
@@ -148,4 +127,25 @@ func (u *watsonsUtil) getInfo() webInfo {
 		Parallel:   u.Parallel,
 		UserAgent:  u.UserAgent,
 	}
+}
+
+func writeHTMLformatting(w http.ResponseWriter, data prodInfo) error {
+	const sec = `<div style = "font-family:Calibri,arial,helvetica;">
+					<div>{{.Name}} #{{.Number}}</div>
+					<a href="{{.ProdLink}}">
+						<img src="{{.ImgLink}}" width="200">
+					</a> 
+					<div>
+						<a href="{{.ProdLink}}">{{.ProdName}}</a>
+					</div>
+					<div>{{.Price}}</div><br>
+				</div>`
+
+	t, err := template.New("product").Parse(sec)
+	if err != nil {
+		return err
+	}
+	err = t.Execute(w, data)
+	fmt.Fprintf(w, "\n")
+	return nil
 }
