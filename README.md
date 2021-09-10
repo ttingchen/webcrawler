@@ -2,10 +2,12 @@
 ## 簡介
 設計一個 Web Service，能依據關鍵字對兩個購物網站 (Waston, Ebay)進行爬蟲，並將結果呈現出來
 
+---
 ## 基本架構
 * 利用 HTTP Handler 建構一個基礎的 Web API
 * 利用第三方爬蟲框架 Colly 來實現爬蟲的基本需求
 * 利用 JSON 來儲存爬蟲結果，提供了資料的高相容性以及未來擴展開發的便利性
+---
 
 ## 其他細節
 * 爬下來的商品資訊包含：名稱、價錢、圖片連結、商品連結
@@ -17,9 +19,11 @@
 * 程式被中斷時，worker 能先將手上任務完成才結束
 * 使用 mutex 來避免 HTTP Writer 造成的 race condition
 * 基於 HTTP Writer 和 Colly 的並用來實現 real time render
+---
 
 ## 尚可改進目標
 * 運用 Database 建立 cache 機制，特定期限內 user 再次搜尋相同關鍵字，就不用再爬一次，但應避免 hard-code DB 連線資訊
+---
 
 ## 使用方式
 * 打開終端機到程式所在位置輸入 
@@ -38,7 +42,8 @@
   
 * Unit-test
   >go test -v ./...
-  
+---
+
 ## 爬蟲結果
 * Client端
 ![search_result](https://user-images.githubusercontent.com/10221555/131598653-25ee7613-1526-4a79-938d-f1504966974b.gif)
